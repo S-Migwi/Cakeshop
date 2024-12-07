@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="content">
+    <div class="container mt-5">
+        <h2 class="text-center mb-4">Order Summary</h2>
+
+        <!-- Order Information -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5>Order Details</h5>
+                <div class="text-end">
+                    <a href="{% url 'edit_order' order.id %}" class="btn btn-warning btn-sm">Edit Order</a>
+                    <a href="{% url 'delete_order' order.id %}" class="btn btn-danger">Delete Order</a>
+                </div>
+            </div>
+            <div class="card-body">
+                <p><strong>Order ID:</strong> {{ order.id }}</p>
+                <p><strong>User:</strong> {{ order.user.username }}</p>
+                <p><strong>Total Price:</strong> Ksh {{ order.total_price }}</p>
+                <p><strong>Status:</strong> {% if order.is_paid %} Paid {% else %} Pending {% endif %}</p>
+            </div>
+        </div>
+
+        <!-- Order Items -->
+        <h4 class="mb-3">Items in Your Order</h4>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Product</th>
+                    <th>Quantity</th>
+                    <th>Price</th>
+                    <th>Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in order.items.all %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ item.product.name }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td>Ksh {{ item.product.price }}</td>
+                    <td>Ksh {{ item.price }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center">No items in the order.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <h3>Total: Ksh {{ order.total_price }}</h3>
+
+        <!-- Buttons -->
+        <div class="d-flex justify-content-between">
+            <a href="{% url 'place_order' %}" class="btn btn-success">Add More Items</a>
+        </div>
+        <div class="text-center mb-3">
+            <button onclick="window.print();" class="btn btn-secondary">Print Order</button>
+        </div>
+
+    </div>
+</div>
+
+<style>
+    @media print {
+        body {
+            font-size: 14px;
+            color: #146c43;
+        }
+
+
+        .btn, .navbar, footer {
+            display: none;
+        }
+
+        .order-details {
+            padding: 10px;
+            border: 1px solid #ccc;
+            margin-bottom: 20px;
+        }
+    }
+</style>
+
+{% endblock %}

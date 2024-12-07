@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+
+
+
+<div class="text-primary text-center bg-light py-3">
+  <h3>Welcome to our Home Page</h3>
+</div>
+
+<div id="carouselExampleAutoplaying" class="carousel slide" data-bs-ride="carousel">
+  <div class="carousel-inner">
+    <div class="carousel-item active">
+      <img src="../../static/images/Cake1.jpg" class="d-block w-100 img-fluid" alt="cake1">
+    </div>
+    <div class="carousel-item">
+      <img src="../../static/images/Cake2.jpg" class="d-block w-100 img-fluid" alt="cake2">
+    </div>
+    <div class="carousel-item">
+      <img src="../../static/images/Cake3.jpg" class="d-block w-100 img-fluid" alt="cake3">
+    </div>
+    <div class="carousel-item">
+      <img src="../../static/images/Cake4.jpg" class="d-block w-100 img-fluid" alt="cake4">
+    </div>
+    <div class="carousel-item">
+      <img src="../../static/images/Cake5.jpg" class="d-block w-100 img-fluid" alt="cake5">
+    </div>
+    <div class="carousel-item">
+      <img src="../../static/images/Cake6.jpg" class="d-block w-100 img-fluid" alt="cake6">
+    </div>
+  </div>
+  <button class="carousel-control-prev" type="button" data-bs-target="#carouselExampleAutoplaying" data-bs-slide="prev">
+    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+    <span class="visually-hidden">Previous</span>
+  </button>
+  <button class="carousel-control-next" type="button" data-bs-target="#carouselExampleAutoplaying" data-bs-slide="next">
+    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+    <span class="visually-hidden">Next</span>
+  </button>
+</div>
+
+<div class="container text-center mb-4">
+  <div class="jumbotron bg-warning text-dark rounded shadow-lg p-5">
+    <h1 class="display-4">Welcome to Our Cake Shop Services</h1>
+    <p class="lead">We Bake with Love.</p>
+    <hr class="my-4">
+    <p>We offer a wide variety of cakes and cake accessories.</p>
+    <p class="lead">
+      <a class="btn btn-primary btn-lg" href="#" role="button">Learn more</a>
+    </p>
+  </div>
+</div>
+
+{% endblock %}

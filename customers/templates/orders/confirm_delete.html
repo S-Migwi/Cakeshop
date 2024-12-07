@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="content">
+    <div class="container mt-5">
+        <h2 class="text-center">Delete Order</h2>
+        {% if messages %}
+            <div class="alert-container">
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        <p class="text-center">Are you sure you want to delete Order <strong>#{{ order.id }}</strong>?</p>
+            <div class="text-center">
+                <form method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Yes, Delete</button>
+                    <a href="{% url 'view_order' order.id %}" class="btn btn-secondary">Cancel</a>
+                </form>
+            </div>
+    </div>
+</div>
+
+
+{% endblock %}

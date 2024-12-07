@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+
+<div class="container mt-5">
+      <h1 class="text-center mb-4">Delete Product</h1>
+      <p class="text-center">Are you sure you want to delete the product "{{ product.name }}"?</p>
+      <form method="POST">
+          {% csrf_token %}
+          <div class="d-flex justify-content-center gap-2">
+              <button type="submit" class="btn btn-danger">Delete</button>
+              <a href="{% url 'product_list' %}" class="btn btn-secondary">Cancel</a>
+          </div>
+      </form>
+</div>
+
+
+
+
+
+
+{% endblock %}

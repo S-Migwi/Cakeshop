@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="content">
+    <div class="container mt-5">
+        <h2>Product Gallery</h2>
+        <div class="gallery">
+            {% load static %}
+            <div class="row">
+                <div class="col-md-4 gallery-item mb-4">
+                <img src="{% static 'images/Cake1.jpg' %}" class="img-fluid" alt="Cake 1">
+                <h5>Wedding Cakes</h5>
+            </div>
+            <div class="col-md-4 gallery-item mb-4">
+                <img src="{% static 'images/Cake2.jpg' %}" class="img-fluid" alt="Cake 2">
+                <h5>Happy Birthday Cakes</h5>
+            </div>
+            <div class="col-md-4 gallery-item mb-4">
+                <img src="{% static 'images/Cake8.jpg' %}" class="img-fluid" alt="Cake 8">
+                <h5>Graduation Cakes</h5>
+            </div>
+            <div class="col-md-4 gallery-item mb-4">
+                <img src="{% static 'images/Cake4.jpg' %}" class="img-fluid" alt="Cake 4">
+                <h5>Cupcakes</h5>
+            </div>
+            <div class="col-md-4 gallery-item mb-4">
+                <img src="{% static 'images/Cake5.jpg' %}" class="img-fluid" alt="Cake 5">
+                <h5>Customized Cakes</h5>
+            </div>
+            <div class="col-md-4 gallery-item mb-4">
+                <img src="{% static 'images/Product1.jpg' %}" class="img-fluid" alt="Product 1">
+                <h5>Cake Decorations</h5>
+            </div>
+            <div class="col-md-4 gallery-item mb-4">
+                <img src="{% static 'images/Product2.jpg' %}" class="img-fluid" alt="Product 2">
+                <h5>Happy Birthday Decorations</h5>
+            </div>
+            <div class="col-md-4 gallery-item mb-4">
+                <img src="{% static 'images/Product3.jpg' %}" class="img-fluid" alt="Product 3">
+                <h5>Cake Accessories: Mould</h5>
+            </div>
+            <div class="col-md-4 gallery-item mb-4">
+                <img src="{% static 'images/Product4.jpg' %}" class="img-fluid" alt="Product 4">
+                <h5>Cake Accessories </h5>
+            </div>
+            <div class="col-md-4 gallery-item mb-4">
+                <img src="{% static 'images/Product6.jpg' %}" class="img-fluid" alt="Product 6">
+                <h5>Cake Toppers</h5>
+            </div>
+            <div class="col-md-4 gallery-item mb-4">
+                <img src="{% static 'images/Product5.jpg' %}" class="img-fluid" alt="Product 5">
+                <h5>Event Decorations</h5>
+            </div>
+            <div class="col-md-4 gallery-item mb-4">
+                <img src="{% static 'images/Product7.jpg' %}" class="img-fluid" alt="Product 7">
+                <h5>Cake Accessories</h5>
+            </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<style>
+    .gallery {
+        margin-top: 20px;
+    }
+    .gallery-item img {
+        max-height: 200px;
+        object-fit: cover;
+        border: 2px solid #ddd;
+        border-radius: 5px;
+        padding: 5px;
+        transition: transform 0.3s ease, box-shadow 0.3s ease; /* Smooth animation */
+    }
+    .gallery-item img:hover {
+        transform: translateY(-10px) scale(1.05); /* Float and slightly enlarge */
+        box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2); /* Add a shadow */
+    }
+    .gallery-item {
+        text-align: center;
+    }
+    .gallery-item h5 {
+        margin-top: 10px;
+        font-size: 1.1rem;
+    }
+</style>
+
+{% endblock %}
