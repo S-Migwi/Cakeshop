@@ -107,15 +107,63 @@ def suppliers_page(request):
     return render(request, 'suppliers_page.html', {'form': form, 'suppliers': suppliers})
 
 
+@login_required
+def edit_supplier(request, supplier_id):
+    supplier = get_object_or_404(Supplier, id=supplier_id)
+    if request.method == 'POST':
+        form = SupplierForm(request.POST, instance=supplier)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Supplier updated successfully.')
+            return redirect('suppliers_page')
+    else:
+        form = SupplierForm(instance=supplier)
+
+    return render(request, 'edit_supplier.html', {'form': form, 'supplier': supplier})
 
 
+
+
+@login_required
+def delete_supplier(request, supplier_id):
+    supplier = get_object_or_404(Supplier, id=supplier_id)
+    if request.method == 'POST':
+        supplier.delete()
+        messages.success(request, 'Supplier deleted successfully.')
+    else:
+        messages.error(request, 'Invalid request method.')
+    return redirect('suppliers_page')
+
+
+def edit_contact(request, pk):
+    contact = get_object_or_404(Contact, pk=pk)
+
+    if request.method == 'POST':
+        form = ContactForm(request.POST, instance=contact)
+        if form.is_valid():
+            form.save()
+            return redirect('feedback')  # Replace with your list view name
+    else:
+        form = ContactForm(instance=contact)
+
+    return render(request, 'edit_contact.html', {'form': form})
+
+
+def delete_contact(request, pk):
+    contact = get_object_or_404(Contact, pk=pk)
+
+    if request.method == 'POST':
+        contact.delete()
+        return redirect('feedback')  # Replace with your list view name
+
+    return render(request, 'confirm_delete.html', {'contact': contact})
 
 
 
 @login_required
 def product_create(request):
     if request.method == 'POST':
-        form = ProductForm(request.POST)
+        form = ProductForm(request.POST,request.FILES)
         if form.is_valid():
             form.save()
             messages.success(request, 'Product added successfully!')
@@ -135,7 +183,7 @@ def product_update(request, pk):
                 file_name = os.path.basename(request.FILES['image'].name)
                 messages.success(request, f'Customer updated successfully! {file_name} uploaded')
             else:
-                messages.error(request, 'Customer details updated successfully')
+                messages.error(request, 'Product details updated successfully')
             return redirect('product_list')
         else:
             messages.error(request, 'Please confirm your changes')

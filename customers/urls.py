@@ -44,5 +44,9 @@ urlpatterns = [
     path('generate_pdf/', views.generate_pdf, name='generate_pdf'),
     path('gallery/', views.product_gallery, name='product_gallery'),
     path('suppliers/', views.suppliers_page, name='suppliers_page'),
+    path('supplier/delete/<int:supplier_id>/', views.delete_supplier, name='delete_supplier'),
+    path('supplier/edit/<int:supplier_id>/', views.edit_supplier, name='edit_supplier'),
+    path('contacts/<int:pk>/edit/', views.edit_contact, name='edit_contact'),
+    path('contacts/<int:pk>/delete/', views.delete_contact, name='delete_contact'),
 
 ]

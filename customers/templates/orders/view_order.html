@@ -3,84 +3,174 @@
 {% block content %}
 <div class="content">
     <div class="container mt-5">
-        <h2 class="text-center mb-4">Order Summary</h2>
+        <!-- Screen View -->
+        <h2 class="text-center mb-4 screen-only">Order Summary</h2>
 
-        <!-- Order Information -->
-        <div class="card mb-4">
-            <div class="card-header bg-primary text-white">
+        <div class="card mb-4 screen-only">
+            <div class="card-header bg-primary text-white d-flex justify-content-between">
                 <h5>Order Details</h5>
-                <div class="text-end">
-                    <a href="{% url 'edit_order' order.id %}" class="btn btn-warning btn-sm">Edit Order</a>
-                    <a href="{% url 'delete_order' order.id %}" class="btn btn-danger">Delete Order</a>
+                <div>
+                    <a href="{% url 'edit_order' order.id %}" class="btn btn-warning btn-sm">Edit</a>
+                    <a href="{% url 'delete_order' order.id %}" class="btn btn-danger btn-sm">Delete</a>
                 </div>
             </div>
-            <div class="card-body">
-                <p><strong>Order ID:</strong> {{ order.id }}</p>
-                <p><strong>User:</strong> {{ order.user.username }}</p>
-                <p><strong>Total Price:</strong> Ksh {{ order.total_price }}</p>
-                <p><strong>Status:</strong> {% if order.is_paid %} Paid {% else %} Pending {% endif %}</p>
+        </div>
+
+        <!-- Printable Receipt -->
+        <div id="receipt">
+            <div class="receipt-content">
+                <div class="receipt-header">
+                    <h3>Cakes By Brenda</h3>
+                    <p>Mbaria Kaniu Road, Naivasha<br>
+                    Tel: +254 721462341</p>
+                </div>
+
+                <div class="receipt-body">
+                    <div class="receipt-row">
+                        <span>Order ID:</span>
+                        <span>{{ order.id }}</span>
+                    </div>
+                    <div class="receipt-row">
+                        <span>Date:</span>
+                        <span>{{ order.created_at|date:"M d, Y, h:i a" }}</span>
+                    </div>
+
+                    <div class="receipt-divider"></div>
+
+                    <div class="receipt-table">
+                        <div class="table-header">
+                            <span>Item</span>
+                            <span>Qty</span>
+                            <span>Price</span>
+                        </div>
+                        {% for item in order.items.all %}
+                        <div class="table-row">
+                            <span>{{ item.product.name|truncatechars:20 }}</span>
+                            <span>{{ item.quantity }}</span>
+                            <span>Ksh {{ item.price|floatformat:2 }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="receipt-divider"></div>
+
+                    <div class="receipt-total">
+                        <span>Total:</span>
+                        <span>Ksh {{ order.total_price|floatformat:2 }}</span>
+                    </div>
+
+                    <div class="receipt-footer">
+                        <p>Thank you for your order!<br>
+                        Visit again soon.</p>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Order Items -->
-        <h4 class="mb-3">Items in Your Order</h4>
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Product</th>
-                    <th>Quantity</th>
-                    <th>Price</th>
-                    <th>Subtotal</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in order.items.all %}
-                <tr>
-                    <td>{{ forloop.counter }}</td>
-                    <td>{{ item.product.name }}</td>
-                    <td>{{ item.quantity }}</td>
-                    <td>Ksh {{ item.product.price }}</td>
-                    <td>Ksh {{ item.price }}</td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="5" class="text-center">No items in the order.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <h3>Total: Ksh {{ order.total_price }}</h3>
-
-        <!-- Buttons -->
-        <div class="d-flex justify-content-between">
-            <a href="{% url 'place_order' %}" class="btn btn-success">Add More Items</a>
+        <div class="text-center mt-3 screen-only">
+            <button onclick="window.print()" class="btn btn-secondary">Print Receipt</button>
         </div>
-        <div class="text-center mb-3">
-            <button onclick="window.print();" class="btn btn-secondary">Print Order</button>
-        </div>
-
     </div>
 </div>
 
 <style>
+    /* Screen Styles */
+    .screen-only { display: block; }
+    .receipt-content {
+        max-width: 80mm;
+        margin: 0 auto;
+        padding: 20px;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .receipt-header {
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+
+    .receipt-header h3 {
+        margin: 0 0 0.5rem 0;
+        color: #2c3e50;
+    }
+
+    .receipt-row {
+        display: flex;
+        justify-content: space-between;
+        margin: 0.5rem 0;
+    }
+
+    .receipt-divider {
+        border-bottom: 1px dashed #ddd;
+        margin: 1rem 0;
+    }
+
+    .table-header {
+        display: flex;
+        justify-content: space-between;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+
+    .table-row {
+        display: flex;
+        justify-content: space-between;
+        margin: 0.3rem 0;
+    }
+
+    /* Print Styles */
     @media print {
+        /* Add this rule to hide footer */
+        footer, .footer, .site-footer {
+            display: none !important;
+        }
+        @page {
+            size: auto;
+            margin: 5mm;
+        }
+
         body {
-            font-size: 14px;
-            color: #146c43;
+            background: white !important;
+            font-family: 'Courier New', monospace !important;
+            font-size: 14pt !important;
+        }
+        .screen-only {
+            display: none !important;
         }
 
-
-        .btn, .navbar, footer {
-            display: none;
+        #receipt {
+            width: 80mm !important;
+            margin: 0 auto !important;
+            padding: 0 !important;
+            box-shadow: none !important;
         }
 
-        .order-details {
-            padding: 10px;
-            border: 1px solid #ccc;
-            margin-bottom: 20px;
+        .receipt-content {
+            all: initial !important;
+            font-family: inherit !important;
+            font-size: inherit !important;
+        }
+
+        .receipt-header h3 {
+            font-size: 16pt !important;
+            text-align: center !important;
+        }
+
+        .table-header span,
+        .table-row span {
+            width: 33%;
+            display: inline-block;
+        }
+
+        .receipt-divider {
+            border-bottom: 2px dashed #000 !important;
+        }
+
+        .receipt-footer {
+            text-align: center !important;
+            margin-top: 1rem !important;
         }
     }
 </style>
-
 {% endblock %}
