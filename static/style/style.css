@@ -48,6 +48,14 @@ footer .nav-link {
     color: white;
 
 }
+.navbar-custom {
+  background-color: #FF8A65;
+}
+.navbar-custom .navbar-brand,
+.navbar-custom .nav-link {
+  color: #000 !important;
+}
+
 
 footer .nav-link:hover {
   color: #ff7e5f; /* A nice accent color */
@@ -111,3 +119,5 @@ form {
     font-size: 1.1rem;
     font-weight: bold;
 }
+
+

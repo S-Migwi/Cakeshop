@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% block content %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container-fluid">
+            <a class="navbar-brand" href="#">Cake Shop Inventory Management System</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{% url 'dashboard' %}">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'product_list' %}">Products</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'place_order' %}">Orders</a>
+                    </li>
+                    <li class="nav-item">
+                      <a class="nav-link" href="{% url 'orders_report' %}">Orders Report</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'profit_loss' %}">Profit & Loss</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'feedback' %}">Feedbacks</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'suppliers_page' %}">Suppliers</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'login' %}">Logout</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+</nav>
+<div class="content">
+  <div class="container mt-5">
+  <h2 class="mb-4">Orders Report</h2>
+
+  <div class="table-responsive">
+    <table class="table table-bordered table-hover">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>Day</th>
+          <th>Month</th>
+          <th>Year</th>
+          <th>Product</th>
+          <th>Qty</th>
+          <th>Unit Price (Kshs)</th>
+          <th>Line Total (Kshs)</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in orders %}
+          {% for item in order.items.all %}
+          <tr>
+            <td>{{ forloop.parentloop.counter }}</td>
+            <td>{{ order.created_at|date:"l, d" }}</td>
+            <td>{{ order.created_at|date:"F" }}</td>
+            <td>{{ order.created_at|date:"Y" }}</td>
+            <td>{{ item.product.name }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>{{ item.product.price|floatformat:2 }}</td>
+            <td>{{ item.price|floatformat:2 }}</td>
+            {% if forloop.first %}
+            <td rowspan="{{ order.items.count }}">
+              <a href="{% url 'edit_order' order.id %}" class="btn btn-sm btn-warning mb-1">Edit</a><br>
+              <a href="{% url 'delete_order' order.id %}" class="btn btn-sm btn-danger">Delete</a>
+            </td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+        {% empty %}
+        <tr>
+          <td colspan="9" class="text-center">No orders found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      {% if total_sales is not None %}
+      <tfoot>
+        <tr class="table-light">
+          <th colspan="7" class="text-end">Total Sales for {{ sales_date }}:</th>
+          <th colspan="2">Kshs {{ total_sales|floatformat:2 }}</th>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+
+  <!-- sales-by-date calculator (submits back here) -->
+  <div class="mt-4 p-4 border rounded">
+    <h5>Calculate Sales for a Specific Day</h5>
+    <form method="get" class="row g-3 align-items-end">
+      <div class="col-auto">
+        <label for="sales_date" class="form-label">Date</label>
+        <input type="date"
+               id="sales_date"
+               name="sales_date"
+               class="form-control"
+               value="{{ sales_date }}">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary">Show Total</button>
+      </div>
+    </form>
+
+     {% if total_sales is not None %}
+  <div class="alert alert-info mt-3 d-flex justify-content-between align-items-center">
+    <div>
+      Total sales on <strong>{{ sales_date }}</strong> were:
+      <strong>Kshs {{ total_sales|floatformat:2 }}</strong>
+    </div>
+    {# Bonus “Clear” here too for convenience #}
+    <a href="{% url 'orders_report' %}" class="btn btn-sm btn-light">
+      Clear
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+</div>
+</div>
+{% endblock %}

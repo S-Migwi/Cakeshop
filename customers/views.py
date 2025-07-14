@@ -1,16 +1,23 @@
 import os
 from decimal import Decimal
+from io import BytesIO
 
 from django.contrib.auth import authenticate,login as auth_login
 from django.contrib.auth.models import User
+from django.core.mail import mail_admins
+from django.db.models import Sum, F, Count, ExpressionWrapper, DecimalField
+from django.db.models.functions import TruncDate, TruncMonth
 from django.http import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.pdfgen import canvas
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Table, TableStyle, Spacer
 
 from .models import Product, Order, OrderItem, Contact, Gallery, Supplier
-from .forms import ProductForm, OrderItemForm, ContactForm, SupplierForm
+from .forms import ProductForm, OrderItemForm, ContactForm, SupplierForm, ProfitLossForm
 from django.contrib import messages
 
 
@@ -38,6 +45,7 @@ def contact(request):
 
 
 
+
 def user_login(request):
     if request.method == 'POST':
         username = request.POST['username']
@@ -57,8 +65,33 @@ def dashboard(request):
     return render(request, 'dashboard.html')
 
 def product_list(request):
-    products = Product.objects.all()
-    return render(request, 'products/product_list.html', {'products': products})
+    q = request.GET.get('q', '').strip()
+    if q:
+        products = Product.objects.filter(name__icontains=q)
+    else:
+        products = Product.objects.all()
+
+    # ——— low-stock check & notify ———
+    low_stock_items = products.filter(stock__lt=5)
+    for p in low_stock_items:
+        messages.warning(
+            request,
+            f'⚠️ "{p.name}" only has {p.stock} left in stock!'
+        )
+
+    # optional: email site admins once per page-load if any low-stock items exist
+    if low_stock_items.exists():
+        subject = "Low Stock Alert"
+        body = "\n".join(
+            f'- {p.name}: {p.stock} left'
+            for p in low_stock_items
+        )
+        mail_admins(subject, body)
+
+    return render(request, 'products/product_list.html', {
+        'products': products,
+        'query': q,
+    })
 
 
 def signup(request):
@@ -202,39 +235,77 @@ def product_delete(request, pk):
     return render(request, 'products/product_confirm_delete.html', {'product': product})
 
 
+from decimal import Decimal
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+
+from decimal import Decimal
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+
 def place_order(request):
+    products = Product.objects.all()
+    # Either get or start a new draft order
+    order, _ = Order.objects.get_or_create(
+        user=request.user,
+        is_paid=False,
+        defaults={'total_price': Decimal('0.00')}
+    )
+
     if request.method == 'POST':
-        form = OrderItemForm(request.POST)
-        if form.is_valid():
-            #Get or create an order for the user
-            order, created = Order.objects.get_or_create(user=request.user, is_paid=False)
+        action = request.POST.get('action')
+        selected_ids = request.POST.getlist('products')
+        if not selected_ids:
+            messages.error(request, "Please select at least one product.")
+            return redirect('place_order')
 
-            #create the order item
-            item = form.save(commit=False)
-            item.order = order
-            product =item.product
+        # (Optional) clear out previous draft items:
+        # order.items.all().delete()
+        # order.total_price = Decimal('0.00')
 
-            if product.stock < item.quantity:
-                messages.error(request, f"Not enough stock for {product.name}. Only {product.stock} left.")
-                return redirect('place_order')
+        # Build up the order
+        order_total = Decimal('0.00')
+        for pid in selected_ids:
+            product = get_object_or_404(Product, pk=pid)
+            qty = int(request.POST.get(f'quantity_{pid}', 1))
+            if qty < 1 or product.stock < qty:
+                messages.error(request, f"Issue with {product.name}.")
+                continue
 
-            # calculate price and update stock
-            item.price = Decimal(product.price) * item.quantity
-            product.stock -= item.quantity
+            line_price = Decimal(product.price) * qty
+            OrderItem.objects.create(
+                order=order,
+                product=product,
+                quantity=qty,
+                price=line_price
+            )
+
+            product.stock -= qty
             product.save()
+            order_total += line_price
 
-            if isinstance(order.total_price, float):  # If it's a float, convert it to Decimal
-                order.total_price = Decimal(order.total_price)
+        order.total_price = order_total
+        order.is_paid = True
+        order.save()
 
-            # Save the order item and update order total
-            item.save()
-            order.total_price += item.price
-            order.save()
-            messages.success(request, f"Added {item.quantity} x {product.name} to your order.")
-            return redirect('view_order', order.id)
-    else:
-        form = OrderItemForm()
-    return render(request, 'orders/place_order.html', {'form': form})
+        # Branch on which button was clicked:
+        if action == 'save':
+            messages.success(request, "Order saved! You can view it in the report.")
+            # redirect to your report page (no printing)
+            return redirect('orders_report')
+        elif action == 'print':
+            # render your existing print_receipt.html, passing the order
+            return render(request, 'orders/view_order.html', {
+                'order': order,
+                'items': order.items.select_related('product'),
+            })
+
+    # GET or fall-through
+    return render(request, 'orders/place_order.html', {
+        'products': products,
+    })
+
+
 
 @login_required
 def view_order(request, pk):
@@ -243,37 +314,64 @@ def view_order(request, pk):
 
 
 def edit_order(request, order_id):
-    order = get_object_or_404(Order, id=order_id, user=request.user, is_paid=False)
+    # 1. fetch order and all products
+    order = get_object_or_404(Order, pk=order_id, user=request.user)
+    products = Product.objects.all()
+
+    # 2. build a map of existing OrderItems by product id
+    order_items_map = {item.product.id: item for item in order.items.all()}
+
+    # 3. build product_list entries for the template
+    product_list = []
+    for p in products:
+        existing = order_items_map.get(p.id)
+        product_list.append({
+            'product': p,
+            'selected': bool(existing),
+            'quantity': existing.quantity if existing else 1,
+        })
 
     if request.method == 'POST':
-        form = OrderItemForm(request.POST)
+        selected_ids = request.POST.getlist('products')
+        if not selected_ids:
+            messages.error(request, "Please select at least one product.")
+            return redirect('edit_order', order.id)
 
-        if form.is_valid():
-            product = form.cleaned_data['product']
-            quantity = form.cleaned_data['quantity']
+        # clear out old items and reset total
+        order.items.all().delete()
+        order.total_price = Decimal('0.00')
 
-            # Check if the item already exists in the order
-            if quantity <= 0:
-                messages.error(request, "Quantity must be greater than zero.")
-                return redirect('edit_order', order_id=order.id)
+        for pid in selected_ids:
+            p = get_object_or_404(Product, pk=pid)
+            try:
+                qty = int(request.POST.get(f'quantity_{pid}', 1))
+            except ValueError:
+                qty = 1
 
-                # Check if the item already exists in the order
-            order_item, created = OrderItem.objects.get_or_create(order=order, product=product)
+            if qty < 1 or qty > p.stock:
+                messages.error(request, f"Invalid quantity for {p.name}.")
+                continue
 
-            order_item.quantity = quantity
-            order_item.price = order_item.product.price * order_item.quantity
-            order_item.save()
+            line_price = Decimal(p.price) * qty
+            order.items.create(
+                product=p,
+                quantity=qty,
+                price=line_price
+            )
+            p.stock -= qty
+            p.save()
+            order.total_price += line_price
 
-            # Update order total price
-            order.total_price = sum(item.price for item in order.items.all())
-            order.save()
+        order.save()
+        messages.success(request, "Order updated.")
+        return redirect('view_order', order.id)
 
-            messages.success(request, "Order item updated successfully!")
-            return redirect('view_order', order.id)
-    else:
-        form = OrderItemForm()
+    # GET: render with product_list
+    return render(request, 'orders/edit_order.html', {
+        'order': order,
+        'product_list': product_list,
+    })
 
-    return render(request, 'orders/edit_order.html', {'form': form, 'order': order})
 
 
 def delete_order(request, order_id):
@@ -289,42 +387,141 @@ def delete_order(request, order_id):
     return render(request, 'orders/confirm_delete.html', {'order': order})
 
 def generate_pdf(request):
-    # Create a response object and set the content type to PDF
+    # Buffer instead of writing straight to HttpResponse for Platypus
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter,
+                            rightMargin=40, leftMargin=40,
+                            topMargin=60, bottomMargin=40)
+
+    styles = getSampleStyleSheet()
+    title = Paragraph("Product List Report", styles['Heading1'])
+
+    # Table header
+    data = [[
+        'Product Name',
+        'Description',
+        'Cost Price',
+        'Selling Price',
+        'Stock',
+    ]]
+
+    # Fetch and append each product row
+    for prod in Product.objects.all().order_by('name'):
+        desc = (prod.description[:40] + '…') \
+               if len(prod.description) > 40 else prod.description
+        data.append([
+            prod.name,
+            desc,
+            f"Ksh {prod.cost_price:.2f}",
+            f"Ksh {prod.price:.2f}",
+            str(prod.stock),
+        ])
+
+    # Create the table and style it
+    table = Table(data, colWidths=[100, 200, 80, 80, 50])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#d3d3d3')),
+        ('TEXTCOLOR',   (0, 0), (-1, 0), colors.black),
+        ('ALIGN',       (2, 1), (4, -1), 'RIGHT'),
+        ('GRID',        (0, 0), (-1, -1), 0.5, colors.grey),
+        ('FONTNAME',    (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTNAME',    (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE',    (0, 0), (-1, 0), 12),
+        ('FONTSIZE',    (0, 1), (-1, -1), 10),
+        ('VALIGN',      (0, 0), (-1, -1), 'MIDDLE'),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.whitesmoke, colors.lightgrey]),
+    ]))
+
+    # Build document
+    elements = [title, Spacer(1, 12), table]
+    doc.build(elements)
+
+    # Return PDF response
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="product_report.pdf"'
-
-    # Create a canvas object to generate the PDF
-    p = canvas.Canvas(response, pagesize=letter)
-
-    # Set up the title of the PDF
-    p.setFont("Helvetica-Bold", 16)
-    p.drawString(100, 750, "Product List Report")
-
-    # Set up the table headers
-    p.setFont("Helvetica", 12)
-    p.drawString(50, 730, "Product Name")
-    p.drawString(200, 730, "Description")
-    p.drawString(400, 730, "Price")
-    p.drawString(500, 730, "Stock")
-
-    # Fetch the product data from the database
-    products = Product.objects.all()
-    y_position = 710  # Start drawing content just below the headers
-
-    for product in products:
-        p.drawString(50, y_position, product.name)
-        p.drawString(200, y_position, product.description[:50])  # Truncate the description if it's long
-        p.drawString(400, y_position, f"Ksh {product.price}")
-        p.drawString(500, y_position, str(product.stock))
-        y_position -= 20  # Move down to the next row
-
-        # Add a page if the content overflows
-        if y_position < 50:
-            p.showPage()
-            p.setFont("Helvetica", 12)
-            y_position = 750  # Reset the Y position at the top of the next page
-
-    # Save the PDF document
-    p.showPage()
-    p.save()
+    response.write(buffer.getvalue())
+    buffer.close()
     return response
+
+def orders_report(request):
+    # 1) Base queryset: all paid orders with their items
+    orders = (
+        Order.objects
+             .filter(is_paid=True)
+             .prefetch_related('items__product')
+             .annotate(products_sold=Sum('items__quantity'))
+             .order_by('-created_at')
+    )
+
+    # 2) Did the user ask for a specific date?
+    sales_date  = request.GET.get('sales_date')
+    total_sales = None
+    if sales_date:
+        total = (
+            OrderItem.objects
+                     .filter(order__created_at__date=sales_date)
+                     .aggregate(sum=Sum('price'))['sum']
+        )
+        total_sales = total or Decimal('0.00')
+
+    return render(request, 'orders/orders_report.html', {
+        'orders':      orders,
+        'sales_date':  sales_date,
+        'total_sales': total_sales,
+    })
+
+
+def profit_loss(request):
+    form    = ProfitLossForm(request.GET or None)
+    revenue = cost = profit = Decimal('0.00')
+    details = []
+
+    if form.is_valid():
+        sd = form.cleaned_data['start_date']
+        ed = form.cleaned_data['end_date']
+
+        # Base queryset
+        qs = OrderItem.objects.filter(
+            order__created_at__date__gte=sd,
+            order__created_at__date__lte=ed
+        ).select_related('product', 'order')
+
+        # Annotate each item with line_revenue and line_cost
+        qs = qs.annotate(
+            line_revenue=ExpressionWrapper(
+                F('price') * F('quantity'),
+                output_field=DecimalField(max_digits=12, decimal_places=2)
+            ),
+            line_cost=ExpressionWrapper(
+                F('product__cost_price') * F('quantity'),
+                output_field=DecimalField(max_digits=12, decimal_places=2)
+            ),
+        )
+
+        # Sum up totals
+        revenue = qs.aggregate(total_rev=Sum('line_revenue'))['total_rev'] or Decimal('0.00')
+        cost    = qs.aggregate(total_cost=Sum('line_cost'))['total_cost'] or Decimal('0.00')
+        profit  = revenue - cost
+
+        # Build detail rows
+        for it in qs.order_by('order__created_at'):
+            details.append({
+                'date':        it.order.created_at.date(),
+                'item':        it.product.name,
+                'quantity':    it.quantity,
+                'unit_cost':   it.product.cost_price,
+                'unit_price':  it.price,
+                'line_cost':   it.line_cost,
+                'line_revenue':it.line_revenue,
+                'line_profit': it.line_revenue - it.line_cost,
+            })
+
+    return render(request, 'orders/profit_loss.html', {
+        'form':     form,
+        'revenue':  revenue,
+        'cost':     cost,
+        'profit':   profit,
+        'details':  details,
+    })
+
+

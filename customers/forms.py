@@ -5,21 +5,34 @@ from .models import Product, OrderItem, Contact, Supplier
 class ProductForm(forms.ModelForm):
     class Meta:
         model = Product
-        fields = ['name', 'description', 'price', 'stock', 'image']
+        fields = ['name', 'description', 'cost_price', 'price', 'stock', 'image']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter Product name'}),
             'description': forms.Textarea(attrs={'rows': 2, 'class': 'form-control', 'placeholder': 'Enter Product Description'}),
+            'cost_price': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter Product Cost Price'}),
             'price': forms.TextInput(attrs={'class': 'form-control', 'type': 'number', 'placeholder': 'Enter the Product Price'}),
             'stock': forms.TextInput(attrs={'class': 'form-control', 'type': 'number', 'placeholder': 'Enter the Product Stock'}),
             'image': forms.FileInput(attrs={'class': 'form-control'}),
         }
 
 class OrderItemForm(forms.ModelForm):
+    products = forms.ModelMultipleChoiceField(
+        queryset=Product.objects.all(),
+        widget=forms.CheckboxSelectMultiple
+    )
     class Meta:
         model = OrderItem
         fields = ['product', 'quantity']
 
-
+class ProfitLossForm(forms.Form):
+    start_date = forms.DateField(
+        widget=forms.DateInput(attrs={'type': 'date'}),
+        label="From"
+    )
+    end_date = forms.DateField(
+        widget=forms.DateInput(attrs={'type': 'date'}),
+        label="To"
+    )
 
 class ContactForm(forms.ModelForm):
     class Meta:
@@ -55,3 +68,4 @@ class SupplierForm(forms.ModelForm):
             'address': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter Suppliers Address Number'}),
             'company_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter Suppliers Company Name'}),
         }
+

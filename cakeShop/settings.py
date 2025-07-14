@@ -119,6 +119,15 @@ MESSAGE_TAGS = {
     messages.WARNING: 'warning',
 }
 
+ADMINS = [
+    ('Maina', 'stephenmiguel031@gmail.com'),
+]
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'stephenmiguel031@gmail.com'
+EMAIL_HOST_PASSWORD = 'Beauty0254.'
 
 
 

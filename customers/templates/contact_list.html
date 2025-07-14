@@ -20,6 +20,9 @@
                     <a class="nav-link" href="{% url 'place_order' %}">Orders</a>
                 </li>
                 <li class="nav-item">
+                        <a class="nav-link" href="{% url 'profit_loss' %}">Profit & Loss</a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link" href="{% url 'feedback' %}">Feedbacks</a>
                 </li>
                 <li class="nav-item">
@@ -37,6 +40,7 @@
         <table class="table">
             <thead>
                 <tr>
+                    <th>#</th>
                     <th>Name</th>
                     <th>Phone</th>
                     <th>Option</th>
@@ -48,6 +52,7 @@
             <tbody>
                 {% for contact in contacts %}
                 <tr>
+                    <td>{{ forloop.counter }}</td>
                     <td>{{ contact.name }}</td>
                     <td>{{ contact.phone }}</td>
                     <td>{{ contact.option }}</td>
