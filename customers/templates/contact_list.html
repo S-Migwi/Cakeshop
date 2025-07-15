@@ -3,78 +3,100 @@
 {% block content %}
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="#">Cake Shop Inventory Management System</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav ms-auto">
-                <li class="nav-item">
-                    <a class="nav-link active" href="{% url 'dashboard' %}">Dashboard</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'product_list' %}">Products</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'place_order' %}">Orders</a>
-                </li>
-                <li class="nav-item">
-                        <a class="nav-link" href="{% url 'profit_loss' %}">Profit & Loss</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'feedback' %}">Feedbacks</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'login' %}">Logout</a>
-                </li>
-            </ul>
+  <div class="container-fluid">
+            <a class="navbar-brand" href="#">Cake Shop Inventory Management System</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{% url 'dashboard' %}">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'product_list' %}">Products</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'place_order' %}">Orders</a>
+                    </li>
+                    <li class="nav-item">
+                      <a class="nav-link" href="{% url 'orders_report' %}">Orders Report</a>
+                    </li>
+                    <li class="nav-item">
+                        {% if user.is_superuser %}
+                            <a class="nav-link" href="{% url 'profit_loss' %}">Profit & Loss</a>
+                        {% endif %}
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'feedback' %}">Feedbacks</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'suppliers_page' %}">Suppliers</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'login' %}">Logout</a>
+                    </li>
+                </ul>
+            </div>
         </div>
-    </div>
 </nav>
 
 <div class="content">
-    <div class="container mt-5">
-        <h2>Contact Submissions</h2>
+  <div class="container mt-5">
+    <h2>Contact Submissions</h2>
 
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Name</th>
-                    <th>Phone</th>
-                    <th>Option</th>
-                    <th>Email</th>
-                    <th>Message</th>
-                    <th>Actions</th>  <!-- New column for buttons -->
-                </tr>
-            </thead>
-            <tbody>
-                {% for contact in contacts %}
-                <tr>
-                    <td>{{ forloop.counter }}</td>
-                    <td>{{ contact.name }}</td>
-                    <td>{{ contact.phone }}</td>
-                    <td>{{ contact.option }}</td>
-                    <td>{{ contact.email }}</td>
-                    <td>{{ contact.message|truncatewords:10 }}</td>
-                    <td>
-                        <a href="{% url 'edit_contact' contact.id %}" class="btn btn-primary btn-sm me-1">
-                            Edit
-                        </a>
-                        <a href="{% url 'delete_contact' contact.id %}" class="btn btn-danger btn-sm">
-                            Delete
-                        </a>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="6">No contact submissions found.</td>  <!-- Update colspan to 6 -->
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <!-- Wrap the table in .table-responsive -->
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Option</th>
+            <th>Email</th>
+            <th>Message</th>
+            {% if user.is_superuser %}
+              <th>Actions</th>
+            {% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for contact in contacts %}
+            <tr>
+              <td>{{ forloop.counter }}</td>
+              <td>{{ contact.name }}</td>
+              <td>{{ contact.phone }}</td>
+              <td>{{ contact.option }}</td>
+              <td>{{ contact.email }}</td>
+              <td>{{ contact.message|truncatewords:10 }}</td>
+              {% if user.is_superuser %}
+                <td>
+                  <a href="{% url 'edit_contact' contact.id %}"
+                     class="btn btn-primary btn-sm me-1">
+                    Edit
+                  </a>
+                  <a href="{% url 'delete_contact' contact.id %}"
+                     class="btn btn-danger btn-sm">
+                    Delete
+                  </a>
+                </td>
+              {% endif %}
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="{% if user.is_superuser %}7{% else %}6{% endif %}"
+                  class="text-center">
+                No contact submissions found.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
+    <!-- /.table-responsive -->
+
+  </div>
 </div>
 
 {% endblock %}

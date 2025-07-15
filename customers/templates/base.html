@@ -1,62 +1,106 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>CSIMS</title>
-    {% load static %}
-    <link rel="stylesheet" href="{% static 'style/style.css'%}">
-    <link rel="stylesheet" href="{% static 'style/bootstrap/css/bootstrap.min.css'%}">
+  <meta charset="UTF-8">
+  <title>CSIMS</title>
+
+  {% load static %}
+
+  <!-- 1. Responsive viewport -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- 2. Bootstrap CSS -->
+  <link
+    href="{% static 'style/bootstrap/css/bootstrap.min.css' %}"
+    rel="stylesheet"
+  >
+
+  <!-- Your custom styles (make sure they don’t fix widths) -->
+  <link
+    href="{% static 'style/style.css' %}"
+    rel="stylesheet"
+  >
 </head>
 <body>
-<header>
-<nav class="navbar navbar-expand-lg navbar-custom">
-  <div class="container-fluid">
-    <a class="navbar-brand disabled" href="{% url 'index' %}">Cakes By Brenda</a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
-            aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav ms-auto">
+
+  <header>
+    <!-- 3. Responsive navbar: dark theme, collapses to hamburger -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+      <div class="container">
+        <a class="navbar-brand" href="{% url 'index' %}">
+          Cakes By Brenda
+        </a>
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#mainNav"
+          aria-controls="mainNav"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="mainNav">
+          <ul class="navbar-nav ms-auto">
+            <li class="nav-item">
+              <a class="nav-link{% if request.path == '/' %} active{% endif %}"
+                 href="{% url 'index' %}">Home</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link{% if request.path == '/about/' %} active{% endif %}"
+                 href="{% url 'about' %}">About</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link{% if request.path == '/login/' %} active{% endif %}"
+                 href="{% url 'login' %}">Login</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link{% if request.path == '/contact/' %} active{% endif %}"
+                 href="{% url 'contact' %}">Contact</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link{% if request.path == '/product_gallery/' %} active{% endif %}"
+                 href="{% url 'product_gallery' %}">Products</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <!-- 4. Main content container (fluid will span edge‑to‑edge, container will center) -->
+  <main class="container my-4">
+    {% block content %}
+    {% endblock %}
+  </main>
+
+  <!-- 5. Footer in a full‑width dark bar -->
+  <footer class="bg-dark text-white py-3 mt-auto">
+    <div class="container text-center">
+      <ul class="nav justify-content-center mb-2">
         <li class="nav-item">
-          <a class="nav-link active" aria-current="page" href="{% url 'index' %}">Home</a>
+          <a class="nav-link px-2 text-white" href="{% url 'index' %}">Home</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="{% url 'about' %}">About</a>
+          <a class="nav-link px-2 text-white" href="{% url 'about' %}">About</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="{% url 'login' %}">Login</a>
+          <a class="nav-link px-2 text-white" href="{% url 'contact' %}">Contact</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="{% url 'contact' %}">Contact</a>
+          <a class="nav-link px-2 text-white" href="{% url 'login' %}">Login</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="{% url 'product_gallery' %}">Products</a>
+          <a class="nav-link px-2 text-white" href="{% url 'product_gallery' %}">Products</a>
         </li>
       </ul>
+      <p class="mb-0">© 2024 Cakes by Brenda Ltd</p>
     </div>
-  </div>
-</nav>
-</header>
-
-{% block content %}
-
-{% endblock %}
-
-<div class="container-fluid">
-  <footer class="bg-dark text-white py-3">
-    <ul class="nav justify-content-center border-bottom pb-3 mb-3">
-      <li class="nav-item"><a href="{% url 'index' %}" class="nav-link px-2">Home</a></li>
-      <li class="nav-item"><a href="{% url 'about' %}" class="nav-link px-2">About</a></li>
-      <li class="nav-item"><a href="{% url 'contact' %}" class="nav-link px-2">Contact</a></li>
-      <li class="nav-item"><a href="{% url 'login' %}" class="nav-link px-2">Login</a></li>
-      <li class="nav-item"><a href="{% url 'product_gallery' %}" class="nav-link px-2">Products</a></li>
-    </ul>
-    <p class="text-center">© 2024 Cakes by Brenda Ltd</p>
   </footer>
-</div>
 
-
-<script src="../../static/style/bootstrap/js/bootstrap.min.js"></script>
+  <!-- 6. Bootstrap JS (with Popper) -->
+  <script src="{% static 'style/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
 </body>
 </html>

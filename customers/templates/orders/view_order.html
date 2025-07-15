@@ -31,9 +31,10 @@
                         <span>{{ order.id }}</span>
                     </div>
                     <div class="receipt-row">
-                        <span>Date:</span>
-                        <span>{{ order.created_at|date:"M d, Y, h:i a" }}</span>
+                      <span>Date:</span>
+                      <span id="client-date">--/--/---- --:-- --</span>
                     </div>
+
 
                     <div class="receipt-divider"></div>
 
@@ -173,4 +174,23 @@
         }
     }
 </style>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Use the browser's locale to format date + time
+    const now = new Date();
+    // e.g. "Jul 14, 2025, 4:23 PM"
+    const formatted = now.toLocaleString(undefined, {
+      month: 'short',
+      day:   '2-digit',
+      year:  'numeric',
+      hour:         'numeric',
+      minute:       '2-digit',
+      hour12:       true
+    });
+
+    const el = document.getElementById('client-date');
+    if (el) el.textContent = formatted;
+  });
+</script>
+
 {% endblock %}

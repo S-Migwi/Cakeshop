@@ -79,7 +79,9 @@
                     <div class="card-body text-center">
                         <h5 class="card-title">Profit and Loss</h5>
                         <p class="card-text">Evaluate Profit and Loss Statements.</p>
-                        <a href="{% url 'profit_loss' %}" class="btn btn-primary">View Profit and Loss</a>
+                        {% if user.is_superuser %}
+                            <a href="{% url 'profit_loss' %}" class="btn btn-primary">View Profit and Loss</a>
+                        {% endif %}
                     </div>
                 </div>
             </div>

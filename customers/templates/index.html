@@ -1,35 +1,68 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
 
-
-
 <div id="carouselExampleAutoplaying" class="carousel slide" data-bs-ride="carousel">
   <div class="carousel-inner">
+
     <div class="carousel-item active">
-      <img src="../../static/images/Cake1.jpg" class="d-block w-100 img-fluid" alt="cake1">
+      <img
+        src="{% static 'images/Cake1.jpg' %}"
+        class="d-block w-100 img-fluid"
+        alt="cake1"
+        style="max-height: 60vh; object-fit: cover;"
+      >
     </div>
     <div class="carousel-item">
-      <img src="../../static/images/Cake2.jpg" class="d-block w-100 img-fluid" alt="cake2">
+      <img
+        src="{% static 'images/Cake2.jpg' %}"
+        class="d-block w-100 img-fluid"
+        alt="cake2"
+        style="max-height: 60vh; object-fit: cover;"
+      >
     </div>
     <div class="carousel-item">
-      <img src="../../static/images/Cake3.jpg" class="d-block w-100 img-fluid" alt="cake3">
+      <img
+        src="{% static 'images/Cake3.jpg' %}"
+        class="d-block w-100 img-fluid"
+        alt="cake3"
+        style="max-height: 60vh; object-fit: cover;"
+      >
     </div>
     <div class="carousel-item">
-      <img src="../../static/images/Cake4.jpg" class="d-block w-100 img-fluid" alt="cake4">
+      <img
+        src="{% static 'images/Cake4.jpg' %}"
+        class="d-block w-100 img-fluid"
+        alt="cake4"
+        style="max-height: 60vh; object-fit: cover;"
+      >
     </div>
     <div class="carousel-item">
-      <img src="../../static/images/Cake5.jpg" class="d-block w-100 img-fluid" alt="cake5">
+      <img
+        src="{% static 'images/Cake5.jpg' %}"
+        class="d-block w-100 img-fluid"
+        alt="cake5"
+        style="max-height: 60vh; object-fit: cover;"
+      >
     </div>
     <div class="carousel-item">
-      <img src="../../static/images/Cake6.jpg" class="d-block w-100 img-fluid" alt="cake6">
+      <img
+        src="{% static 'images/Cake6.jpg' %}"
+        class="d-block w-100 img-fluid"
+        alt="cake6"
+        style="max-height: 60vh; object-fit: cover;"
+      >
     </div>
+
   </div>
-  <button class="carousel-control-prev" type="button" data-bs-target="#carouselExampleAutoplaying" data-bs-slide="prev">
+  <button class="carousel-control-prev" type="button"
+          data-bs-target="#carouselExampleAutoplaying" data-bs-slide="prev">
     <span class="carousel-control-prev-icon" aria-hidden="true"></span>
     <span class="visually-hidden">Previous</span>
   </button>
-  <button class="carousel-control-next" type="button" data-bs-target="#carouselExampleAutoplaying" data-bs-slide="next">
+  <button class="carousel-control-next" type="button"
+          data-bs-target="#carouselExampleAutoplaying" data-bs-slide="next">
     <span class="carousel-control-next-icon" aria-hidden="true"></span>
     <span class="visually-hidden">Next</span>
   </button>

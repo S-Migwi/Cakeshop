@@ -20,16 +20,48 @@
                     {% csrf_token %}
                     <div class="mb-3">
                         <label for="username" class="form-label">Username</label>
-                        <input type="text" class="form-control" id="username" name="username" placeholder="Enter your username" required>
+                        <input
+                          type="text"
+                          class="form-control"
+                          id="username"
+                          name="username"
+                          placeholder="Enter your username"
+                          required
+                        >
                     </div>
-                    <div class="mb-3">
+                    <div class="mb-3 position-relative">
                         <label for="password" class="form-label">Password</label>
-                        <input type="password" class="form-control" id="password" name="password" placeholder="Enter your password" required>
+                        <input
+                          type="password"
+                          class="form-control"
+                          id="password"
+                          name="password"
+                          placeholder="Enter your password"
+                          required
+                        >
+                        <!-- Show/Hide toggle -->
+                        <div class="form-check mt-1">
+                          <input
+                            class="form-check-input"
+                            type="checkbox"
+                            value=""
+                            id="showPasswordToggle"
+                          >
+                          <label class="form-check-label" for="showPasswordToggle">
+                            Show password
+                          </label>
+                        </div>
                     </div>
                     <div class="d-grid gap-2">
                         <button type="submit" class="btn btn-primary btn-lg">Login</button>
                     </div>
                 </form>
+
+                <!-- Forgot Password link -->
+                <div class="text-center mt-2">
+                  <a href="{% url 'password_reset' %}">Forgot password?</a>
+                </div>
+
                 <p class="text-center mt-3">
                     Don't have an account? <a href="{% url 'signup' %}">Sign up</a>
                 </p>
@@ -38,6 +70,11 @@
     </div>
 </div>
 
-
-
+<!-- Inline JS for Show/Hide password -->
+<script>
+  document.getElementById('showPasswordToggle').addEventListener('change', function() {
+    const pwd = document.getElementById('password');
+    pwd.type = this.checked ? 'text' : 'password';
+  });
+</script>
 {% endblock %}

@@ -37,7 +37,11 @@
         <li class="nav-item"><a class="nav-link" href="{% url 'product_list' %}">Products</a></li>
         <li class="nav-item"><a class="nav-link" href="{% url 'place_order' %}">Orders</a></li>
         <li class="nav-item"><a class="nav-link" href="{% url 'orders_report' %}">Orders Report</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'profit_loss' %}">Profit & Loss</a></li>
+        <li class="nav-item">
+          {% if user.is_superuser %}
+              <a class="nav-link" href="{% url 'profit_loss' %}">Profit & Loss</a>
+          {% endif %}
+        </li>
         <li class="nav-item"><a class="nav-link" href="{% url 'feedback' %}">Feedbacks</a></li>
         <li class="nav-item"><a class="nav-link" href="{% url 'suppliers_page' %}">Suppliers</a></li>
         <li class="nav-item"><a class="nav-link" href="{% url 'login' %}">Logout</a></li>

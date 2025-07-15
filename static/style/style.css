@@ -1,6 +1,6 @@
 .carousel-item img{
     object-fit: cover;
-    height: 800px;
+    max-height: 60vh;
     border-radius: 10px;
     box-shadow: 0 4px rgba(0, 0, 0, 0.1);
 }
@@ -106,7 +106,6 @@ form {
     box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
 }
 
-/* Add this to your static CSS file or inside <style> tag in base.html */
 .card-body {
     padding: 10px;
 }

@@ -20,7 +20,9 @@
                     <a class="nav-link" href="{% url 'place_order' %}">Orders</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="{% url 'profit_loss' %}">Profit & Loss</a>
+                    {% if user.is_superuser %}
+                        <a class="nav-link" href="{% url 'profit_loss' %}">Profit & Loss</a>
+                    {% endif %}
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" href="{% url 'feedback' %}">Feedbacks</a>
@@ -37,86 +39,93 @@
 </nav>
 
 <div class="content">
-    <div class="container mt-5">
-        <h1 class="text-center mb-4">Product Inventory</h1>
-        {# search form #}
-        <form method="get" class="row mb-3">
-            <div class="col-sm-8">
-                <input
-                  type="text"
-                  name="q"
-                  class="form-control"
-                  placeholder="Search products by name…"
-                  value="{{ query }}"
-                >
-            </div>
-            <div class="col-auto">
-                <button type="submit" class="btn btn-primary">Search</button>
-            </div>
-        </form>
-        <div class="d-flex justify-content-between mb-3">
-            <h2>Products</h2>
-            <a href="{% url 'product_create' %}" class="btn btn-success">Add Product</a>
-        </div>
-        {% if messages %}
-        <div class="alert-container">
-            {% for message in messages %}
-            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th>Image</th>
-                    <th>#</th>
-                    <th>Name</th>
-                    <th>Description</th>
-                    <th>Cost Price</th>
-                    <th>Selling Price</th>
-                    <th>Stock</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for product in products %}
-                <tr>
-                    <td>
-                        {% if product.image %}
-                        <img src="{{ product.image.url }}" alt="{{ product.name }}" style="width: 80px; height: 80px; object-fit: cover">
-                        {% else %}
-                        <img src="{% static 'images/placehold.jpg' %}" alt="No Image" style="width: 80px; height: 80px; object-fit: cover">
-                        {% endif %}
-                    </td>
-                    <td>{{ forloop.counter }}</td>
-                    <td>{{ product.name }}</td>
-                    <td>{{ product.description|truncatechars:50 }}</td>
-                    <td>Kshs. {{ product.cost_price }}</td>
-                    <td>Kshs. {{ product.price }}</td>
-                    <td>{{ product.stock }}</td>
-                    <td>
-                        {% if user.is_staff or user.is_superuser %}
-                        <a href="{% url 'product_update' product.pk %}" class="btn btn-primary btn-sm">Edit</a>
-                        <a href="{% url 'product_delete' product.pk %}" class="btn btn-danger btn-sm">Delete</a>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="8" class="text-center">
-                        {% if query %}No products matching “{{ query }}”{% else %}No products available{% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+  <div class="container mt-5">
+    <h1 class="text-center mb-4">Product Inventory</h1>
+
+    <!-- search form, heading, messages -->
+
+    <div class="d-flex justify-content-between mb-3">
+      <h2>Products</h2>
+      {% if user.is_superuser %}
+        <a href="{% url 'product_create' %}" class="btn btn-success">Add Product</a>
+      {% endif %}
     </div>
+
+    {% if messages %}
+      <!-- alerts… -->
+    {% endif %}
+
+    <!-- 1. Make table horizontally scrollable on small screens -->
+    <div class="table-responsive">
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th>Image</th>
+            <th>#</th>
+            <th>Name</th>
+            <th>Description</th>
+            <th>Cost Price</th>
+            <th>Selling Price</th>
+            <th>Stock</th>
+            {% if user.is_superuser %}
+              <th>Actions</th>
+            {% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for product in products %}
+            <tr>
+              <td>
+                {% if product.image %}
+                  <!-- 2. Fluid images with max size -->
+                  <img
+                    src="{{ product.image.url }}"
+                    alt="{{ product.name }}"
+                    class="img-fluid"
+                    style="max-width: 80px; max-height: 80px; object-fit: cover;"
+                  >
+                {% else %}
+                  <img
+                    src="{% static 'images/placehold.jpg' %}"
+                    alt="No Image"
+                    class="img-fluid"
+                    style="max-width: 80px; max-height: 80px; object-fit: cover;"
+                  >
+                {% endif %}
+              </td>
+              <td>{{ forloop.counter }}</td>
+              <td>{{ product.name }}</td>
+              <td>{{ product.description|truncatechars:50 }}</td>
+              <td>Kshs. {{ product.cost_price }}</td>
+              <td>Kshs. {{ product.price }}</td>
+              <td>{{ product.stock }}</td>
+              {% if user.is_superuser %}
+                <td>
+                  <a href="{% url 'product_update' product.pk %}"
+                     class="btn btn-primary btn-sm">Edit</a>
+                  <a href="{% url 'product_delete' product.pk %}"
+                     class="btn btn-danger btn-sm">Delete</a>
+                </td>
+              {% endif %}
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="{% if user.is_superuser %}8{% else %}7{% endif %}"
+                  class="text-center">
+                {% if query %}No products matching “{{ query }}”
+                {% else %}No products available
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
     <div class="text-center mb-3">
-        <a href="{% url 'generate_pdf' %}" class="btn btn-primary">Generate PDF Report</a>
+      <a href="{% url 'generate_pdf' %}" class="btn btn-primary">Generate PDF Report</a>
     </div>
+  </div>
 </div>
 
 {% endblock %}

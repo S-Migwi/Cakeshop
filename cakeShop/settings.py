@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 #from django.conf.global_settings import MEDIA_URL, MEDIA_ROOT
 from django.contrib import messages
@@ -19,6 +20,7 @@ import pymysql
 pymysql.install_as_MySQLdb()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / '.env')
 
 MESSAGE_STORAGE = 'django.contrib.messages.storage.cookie.CookieStorage'
 # Quick-start development settings - unsuitable for production
@@ -30,7 +32,15 @@ SECRET_KEY = 'django-insecure-4(fi+cze31m=&*#uo59-6oaz@^f+q1)p+_g@=d#q68p0i1rljp
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    '127.0.0.1',
+    'localhost',
+    'f2fc66f9d9e4.ngrok-free.app',
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://f2fc66f9d9e4.ngrok-free.app',
+]
 
 
 # Application definition
@@ -42,6 +52,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'widget_tweaks',
     'customers'
 ]
 
@@ -60,7 +71,7 @@ ROOT_URLCONF = 'cakeShop.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -122,12 +133,20 @@ MESSAGE_TAGS = {
 ADMINS = [
     ('Maina', 'stephenmiguel031@gmail.com'),
 ]
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'stephenmiguel031@gmail.com'
-EMAIL_HOST_PASSWORD = 'Beauty0254.'
+
+EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST          = 'smtp.gmail.com'
+EMAIL_PORT          = 587
+EMAIL_USE_TLS       = True
+
+# These should match the names you set below (not your actual address/password)
+EMAIL_HOST_USER     = os.getenv('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
+
+# Make sure your sender isn’t None
+DEFAULT_FROM_EMAIL  = EMAIL_HOST_USER
+SERVER_EMAIL        = EMAIL_HOST_USER
+
 
 
 
@@ -158,4 +177,5 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
 
