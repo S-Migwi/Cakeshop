@@ -102,5 +102,20 @@
 
   <!-- 6. Bootstrap JS (with Popper) -->
   <script src="{% static 'style/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Find all dismissible alerts
+      const alerts = document.querySelectorAll('.alert-dismissible');
+      alerts.forEach(alertEl => {
+        // After 3 seconds, close each one
+        setTimeout(() => {
+          // uses Bootstrap's Alert API to animate-close
+          const bsAlert = bootstrap.Alert.getOrCreateInstance(alertEl);
+          bsAlert.close();
+        }, 3000);
+      });
+    });
+  </script>
+
 </body>
 </html>

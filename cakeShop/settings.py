@@ -147,6 +147,16 @@ EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL  = EMAIL_HOST_USER
 SERVER_EMAIL        = EMAIL_HOST_USER
 
+#Go to your Google account, make sure the 2-step verification is on. Then proceed to search
+#'App passwords'. Create an app password named Django SMTP then click create.
+#Paste the generated 16 character bit generated in .env file and do the following:
+#at the terminal run $env:EMAIL_HOST_USER     = 'stephenmiguel031@gmail.com' and $env:EMAIL_HOST_PASSWORD = 'brzg gtkl ynlr quup'
+#proceed to run 'python manage.py runserver' and to confirm if it works try this:
+#from django.conf import settings
+#print(settings.EMAIL_HOST_USER)          # should print your Gmail address
+#print(bool(settings.EMAIL_HOST_PASSWORD))  # should be True
+
+
 
 
 

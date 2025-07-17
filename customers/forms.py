@@ -10,7 +10,7 @@ class ProductForm(forms.ModelForm):
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter Product name'}),
             'description': forms.Textarea(attrs={'rows': 2, 'class': 'form-control', 'placeholder': 'Enter Product Description'}),
             'cost_price': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter Product Cost Price'}),
-            'price': forms.TextInput(attrs={'class': 'form-control', 'type': 'number', 'placeholder': 'Enter the Product Price'}),
+            'price': forms.TextInput(attrs={'class': 'form-control', 'type': 'number', 'placeholder': 'Enter the Product Selling Price'}),
             'stock': forms.TextInput(attrs={'class': 'form-control', 'type': 'number', 'placeholder': 'Enter the Product Stock'}),
             'image': forms.FileInput(attrs={'class': 'form-control'}),
         }

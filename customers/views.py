@@ -1,3 +1,4 @@
+import io
 import os
 from decimal import Decimal
 from io import BytesIO
@@ -7,7 +8,7 @@ from django.contrib.auth.models import User
 from django.core.mail import mail_admins
 from django.db.models import Sum, F, Count, ExpressionWrapper, DecimalField
 from django.db.models.functions import TruncDate, TruncMonth
-from django.http import HttpResponse
+from django.http import HttpResponse, FileResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from reportlab.lib import colors
@@ -442,33 +443,59 @@ def generate_pdf(request):
     response.write(buffer.getvalue())
     buffer.close()
     return response
+MONTH_CHOICES = [
+    ('01', 'Jan'), ('02', 'Feb'), ('03', 'Mar'), ('04', 'Apr'),
+    ('05', 'May'), ('06', 'Jun'), ('07', 'Jul'), ('08', 'Aug'),
+    ('09', 'Sep'), ('10', 'Oct'), ('11', 'Nov'), ('12', 'Dec'),
+]
 
 def orders_report(request):
-    # 1) Base queryset: all paid orders with their items
-    orders = (
-        Order.objects
-             .filter(is_paid=True)
-             .prefetch_related('items__product')
-             .annotate(products_sold=Sum('items__quantity'))
-             .order_by('-created_at')
-    )
+    start = request.GET.get('start_date')
+    end   = request.GET.get('end_date')
 
-    # 2) Did the user ask for a specific date?
+    # Base queryset of paid orders
+    qs_orders = Order.objects.filter(is_paid=True)
+    if start:
+        qs_orders = qs_orders.filter(created_at__date__gte=start)
+    if end:
+        qs_orders = qs_orders.filter(created_at__date__lte=end)
+
+    # Build the OrderItem queryset, with line_total annotation
+    qs_items = (
+        OrderItem.objects
+                 .filter(order__in=qs_orders)
+                 .select_related('order', 'product')
+                 .annotate(
+                     line_total=ExpressionWrapper(
+                         F('price') * F('quantity'),
+                         output_field=DecimalField(max_digits=12, decimal_places=2)
+                     )
+                 )
+    )  # <- annotate() closed here
+
+    # Group items by order for template
+    orders_grouped = {}
+    for item in qs_items:
+        orders_grouped.setdefault(item.order, []).append(item)
+
+    # Superuser-only daily sales
     sales_date  = request.GET.get('sales_date')
     total_sales = None
-    if sales_date:
-        total = (
-            OrderItem.objects
-                     .filter(order__created_at__date=sales_date)
-                     .aggregate(sum=Sum('price'))['sum']
-        )
-        total_sales = total or Decimal('0.00')
+    if request.user.is_superuser and sales_date:
+        total_sales = (
+            qs_items
+            .filter(order__created_at__date=sales_date)
+            .aggregate(sum=Sum('line_total'))['sum']
+        ) or Decimal('0.00')
 
     return render(request, 'orders/orders_report.html', {
-        'orders':      orders,
+        'orders':      orders_grouped,
+        'start_date':  start,
+        'end_date':    end,
         'sales_date':  sales_date,
         'total_sales': total_sales,
     })
+
 
 
 def profit_loss(request):
@@ -524,4 +551,73 @@ def profit_loss(request):
         'details':  details,
     })
 
+
+def orders_report_pdf(request):
+    start = request.GET.get('start_date')
+    end   = request.GET.get('end_date')
+
+    qs_orders = Order.objects.filter(is_paid=True)
+    if start:
+        qs_orders = qs_orders.filter(created_at__date__gte=start)
+    if end:
+        qs_orders = qs_orders.filter(created_at__date__lte=end)
+
+    qs_items = (
+        OrderItem.objects
+                 .filter(order__in=qs_orders)
+                 .select_related('order', 'product')
+                 .annotate(
+                     line_total=ExpressionWrapper(
+                         F('price') * F('quantity'),  # use price field
+                         output_field=DecimalField(max_digits=12, decimal_places=2)
+                     )
+                 )
+    )
+
+    # Write PDF to buffer
+    buffer = io.BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+
+    # Draw headers
+    p.setFont('Helvetica-Bold', 12)
+    y = 750
+    headers = ['Date', 'Product', 'Qty', 'Price', 'Line Total']
+    x_positions = [30, 100, 260, 320, 400]
+    for idx, header in enumerate(headers):
+        p.drawString(x_positions[idx], y, header)
+    p.setFont('Helvetica', 10)
+    y -= 20
+
+    # Draw rows with borders
+    row_height = 20
+    for item in qs_items:
+        if y < 50:
+            p.showPage()
+            p.setFont('Helvetica-Bold', 12)
+            y = 750
+            for idx, header in enumerate(headers):
+                p.drawString(x_positions[idx], y, header)
+            p.setFont('Helvetica', 10)
+            y -= row_height
+
+        values = [
+            item.order.created_at.strftime('%Y-%m-%d'),
+            item.product.name[:15],
+            str(item.quantity),
+            f"{item.price:.2f}",
+            f"{item.line_total:.2f}"
+        ]
+        for idx, val in enumerate(values):
+            p.drawString(x_positions[idx], y, val)
+        # horizontal border line
+        p.line(x_positions[0], y-2, x_positions[-1]+80, y-2)
+        y -= row_height
+
+    p.save()
+    buffer.seek(0)
+
+    # Return HttpResponse with attachment header
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="orders_report.pdf"'
+    return response
 
