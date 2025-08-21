@@ -53,17 +53,6 @@
   <div class="container mt-5">
     <h1 class="text-center mb-4">Place Order</h1>
 
-    {% if messages %}
-      <div class="alert-container">
-        {% for message in messages %}
-          <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-          </div>
-        {% endfor %}
-      </div>
-    {% endif %}
-
     <form id="orderForm" method="POST">
       {% csrf_token %}
       <input type="hidden" name="action" id="actionField" value="">
@@ -103,62 +92,86 @@
 </div>
 
 <script>
-  document.addEventListener('DOMContentLoaded', () => {
-    const orderForm = document.getElementById('orderForm');
-    const actionField = document.getElementById('actionField');
-    const totalField = document.getElementById('totalField');
-    const saveBtn = document.getElementById('saveBtn');
-    const printBtn = document.getElementById('printBtn');
-    const clearBtn = document.getElementById('clearBtn');
-    const productListItems = Array.from(document.querySelectorAll('#productList li'));
+document.addEventListener('DOMContentLoaded', () => {
+  const orderForm = document.getElementById('orderForm');
+  const actionField = document.getElementById('actionField');
+  const totalField = document.getElementById('totalField');
+  const saveBtn = document.getElementById('saveBtn');
+  const printBtn = document.getElementById('printBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const calculateBtn = document.getElementById('calculateBtn');
+  const productListItems = Array.from(document.querySelectorAll('#productList li'));
 
-    // Toggle quantity inputs
+  // Initialize data-price attribute for each product price badge
+  productListItems.forEach(li => {
+    const priceBadge = li.querySelector('.price-badge');
+    // set a numeric value on data-price so we don't need to parse Kshs text later
+    // Assumes price badge contains the raw price value in template: "Kshs {{ product.price }}"
+    const raw = priceBadge.textContent.replace(/[^0-9.]/g, '');
+    priceBadge.dataset.price = raw || '0';
+  });
+
+  // Toggle quantity inputs
+  productListItems.forEach(li => {
+    const cb = li.querySelector('.product-checkbox');
+    const qtyInput = li.querySelector('.quantity-input');
+    cb.addEventListener('change', () => {
+      qtyInput.disabled = !cb.checked;
+      if (!cb.checked) qtyInput.value = 1;
+    });
+  });
+
+  // Calculate total with selection validation
+  calculateBtn.addEventListener('click', () => {
+    const selectedBoxes = productListItems.filter(li => li.querySelector('.product-checkbox').checked);
+    if (selectedBoxes.length === 0) {
+      alert('Please select at least one product to calculate.');
+      return;
+    }
+    let total = 0;
+    for (const li of selectedBoxes) {
+      const cb = li.querySelector('.product-checkbox');
+      const id = cb.value;
+      const qty = Number(li.querySelector(`input[name=quantity_${id}]`).value) || 0;
+      const price = parseFloat(li.querySelector('.price-badge').dataset.price) || 0;
+      if (qty < 1) { alert('Quantity must be at least 1'); return; }
+      total += qty * price;
+    }
+    totalField.value = 'Kshs ' + total.toFixed(2);
+    saveBtn.disabled = false;
+    printBtn.disabled = false;
+  });
+
+  // Save action -> prevent double submit by disabling button immediately
+  saveBtn.addEventListener('click', (e) => {
+    // disable to avoid accidental double-post
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    actionField.value = 'save';
+    orderForm.submit();
+  });
+
+  // Print action -> also disable & submit
+  printBtn.addEventListener('click', (e) => {
+    printBtn.disabled = true;
+    actionField.value = 'print';
+    orderForm.submit();
+  });
+
+  // Clear everything
+  clearBtn.addEventListener('click', () => {
+    totalField.value = '';
+    saveBtn.disabled = true;
+    printBtn.disabled = true;
     productListItems.forEach(li => {
       const cb = li.querySelector('.product-checkbox');
       const qtyInput = li.querySelector('.quantity-input');
-      cb.addEventListener('change', () => {
-        qtyInput.disabled = !cb.checked;
-        if (!cb.checked) qtyInput.value = 1;
-      });
-    });
-
-    // Calculate total with selection validation
-    document.getElementById('calculateBtn').addEventListener('click', () => {
-      const selectedBoxes = productListItems.filter(li => li.querySelector('.product-checkbox').checked);
-      if (selectedBoxes.length === 0) {
-        alert('Please select at least one product to calculate.');
-        return;
-      }
-      let total = 0;
-      selectedBoxes.forEach(li => {
-        const cb = li.querySelector('.product-checkbox');
-        const id = cb.value;
-        const qty = Number(li.querySelector(`input[name=quantity_${id}]`).value);
-        const priceText = li.querySelector('.price-badge').textContent.replace(/[^0-9\.]/g, '');
-        total += qty * parseFloat(priceText);
-      });
-      totalField.value = 'Kshs ' + total.toFixed(2);
-      saveBtn.disabled = false;
-      printBtn.disabled = false;
-    });
-
-    // Save and Print actions
-    saveBtn.addEventListener('click', () => { actionField.value = 'save'; orderForm.submit(); });
-    printBtn.addEventListener('click', () => { actionField.value = 'print'; orderForm.submit(); });
-
-    // Clear everything
-    clearBtn.addEventListener('click', () => {
-      totalField.value = '';
-      saveBtn.disabled = true;
-      printBtn.disabled = true;
-      productListItems.forEach(li => {
-        const cb = li.querySelector('.product-checkbox');
-        const qtyInput = li.querySelector('.quantity-input');
-        cb.checked = false;
-        qtyInput.disabled = true;
-        qtyInput.value = 1;
-      });
+      cb.checked = false;
+      qtyInput.disabled = true;
+      qtyInput.value = 1;
     });
   });
+});
 </script>
+
 {% endblock %}

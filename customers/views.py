@@ -6,6 +6,7 @@ from io import BytesIO
 from django.contrib.auth import authenticate,login as auth_login
 from django.contrib.auth.models import User
 from django.core.mail import mail_admins
+from django.db import transaction
 from django.db.models import Sum, F, Count, ExpressionWrapper, DecimalField
 from django.db.models.functions import TruncDate, TruncMonth
 from django.http import HttpResponse, FileResponse
@@ -247,7 +248,7 @@ from django.contrib import messages
 def place_order(request):
     products = Product.objects.all()
     # Either get or start a new draft order
-    order, _ = Order.objects.get_or_create(
+    order, created = Order.objects.get_or_create(
         user=request.user,
         is_paid=False,
         defaults={'total_price': Decimal('0.00')}
@@ -260,42 +261,60 @@ def place_order(request):
             messages.error(request, "Please select at least one product.")
             return redirect('place_order')
 
-        # (Optional) clear out previous draft items:
-        # order.items.all().delete()
-        # order.total_price = Decimal('0.00')
+        # --- Important: use a transaction to avoid partial saves on error ---
+        with transaction.atomic():
+            # OPTIONAL BUT RECOMMENDED: clear previous draft items so we don't duplicate
+            # If you want to keep cart-like behavior, remove the next two lines.
+            if order.items.exists():
+                order.items.all().delete()
+                order.total_price = Decimal('0.00')
 
-        # Build up the order
-        order_total = Decimal('0.00')
-        for pid in selected_ids:
-            product = get_object_or_404(Product, pk=pid)
-            qty = int(request.POST.get(f'quantity_{pid}', 1))
-            if qty < 1 or product.stock < qty:
-                messages.error(request, f"Issue with {product.name}.")
-                continue
+            order_total = Decimal('0.00')
 
-            line_price = Decimal(product.price) * qty
-            OrderItem.objects.create(
-                order=order,
-                product=product,
-                quantity=qty,
-                price=line_price
-            )
+            for pid in selected_ids:
+                product = get_object_or_404(Product, pk=pid)
+                try:
+                    qty = int(request.POST.get(f'quantity_{pid}', 1))
+                except (ValueError, TypeError):
+                    qty = 1
 
-            product.stock -= qty
-            product.save()
-            order_total += line_price
+                if qty < 1:
+                    messages.error(request, f"Invalid quantity for {product.name}.")
+                    continue
+                if product.stock < qty:
+                    messages.error(request, f"Not enough stock for {product.name}. Available: {product.stock}.")
+                    continue
 
-        order.total_price = order_total
-        order.is_paid = True
-        order.save()
+                # Use the unit price from the DB (do NOT save the multiplied line price into price)
+                unit_price = Decimal(product.price)
+                # line_price is for computing totals & reducing stock only
+                line_price = (unit_price * qty).quantize(Decimal('0.01'))
+
+                # Save OrderItem with unit price (so future calculations do price * quantity correctly)
+                OrderItem.objects.create(
+                    order=order,
+                    product=product,
+                    quantity=qty,
+                    price=unit_price,   # <-- store unit price, not line total
+                )
+
+                # reduce stock and accumulate order total
+                product.stock -= qty
+                product.save(update_fields=['stock'])
+
+                order_total += line_price
+
+            # finalize the order
+            order.total_price = order_total.quantize(Decimal('0.01'))
+            order.is_paid = True
+            order.save()
 
         # Branch on which button was clicked:
         if action == 'save':
             messages.success(request, "Order saved! You can view it in the report.")
-            # redirect to your report page (no printing)
             return redirect('orders_report')
         elif action == 'print':
-            # render your existing print_receipt.html, passing the order
+            # render your existing print/view page, passing the order and its items
             return render(request, 'orders/view_order.html', {
                 'order': order,
                 'items': order.items.select_related('product'),
@@ -383,7 +402,7 @@ def delete_order(request, order_id):
         # Delete the order
         order.delete()
         messages.success(request, f"Order {order_id} has been deleted successfully!")
-        return redirect('place_order')  # Redirect to a relevant page (e.g., dashboard or order list)
+        return redirect('orders_report')  # Redirect to a relevant page (e.g., dashboard or order list)
 
     return render(request, 'orders/confirm_delete.html', {'order': order})
 
