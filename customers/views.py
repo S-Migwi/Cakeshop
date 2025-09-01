@@ -66,6 +66,8 @@ def user_login(request):
 def dashboard(request):
     return render(request, 'dashboard.html')
 
+LOW_STOCK_THRESHOLD = 5
+
 def product_list(request):
     q = request.GET.get('q', '').strip()
     if q:
@@ -74,20 +76,29 @@ def product_list(request):
         products = Product.objects.all()
 
     # ——— low-stock check & notify ———
-    low_stock_items = products.filter(stock__lt=5)
+    low_stock_items = products.filter(stock__lt=LOW_STOCK_THRESHOLD)
+
+    # Keep the on-page user warnings every request
     for p in low_stock_items:
         messages.warning(
             request,
             f'⚠️ "{p.name}" only has {p.stock} left in stock!'
         )
 
-    # optional: email site admins once per page-load if any low-stock items exist
-    if low_stock_items.exists():
+    # Prepare to email admins only about items that have NOT been notified before
+    new_low_qs = low_stock_items.filter(low_stock_notified=False)
+
+    if new_low_qs.exists():
+        new_low = list(new_low_qs)  # evaluate queryset so we can reference the objects
         subject = "Low Stock Alert"
-        body = "\n".join(
-            f'- {p.name}: {p.stock} left'
-            for p in low_stock_items
-        )
+        body = "\n".join(f'- {p.name}: {p.stock} left' for p in new_low)
+
+        # Atomically mark those products as notified to reduce race conditions
+        with transaction.atomic():
+            ids = [p.pk for p in new_low]
+            Product.objects.filter(pk__in=ids, low_stock_notified=False).update(low_stock_notified=True)
+
+        # Send a single email for all newly-notified items
         mail_admins(subject, body)
 
     return render(request, 'products/product_list.html', {
@@ -246,7 +257,13 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 
 def place_order(request):
-    products = Product.objects.all()
+    # server-side search support (reads ?q=...)
+    q = request.GET.get('q', '').strip()
+    if q:
+        products = Product.objects.filter(name__icontains=q)
+    else:
+        products = Product.objects.all()
+
     # Either get or start a new draft order
     order, created = Order.objects.get_or_create(
         user=request.user,
@@ -261,10 +278,8 @@ def place_order(request):
             messages.error(request, "Please select at least one product.")
             return redirect('place_order')
 
-        # --- Important: use a transaction to avoid partial saves on error ---
         with transaction.atomic():
-            # OPTIONAL BUT RECOMMENDED: clear previous draft items so we don't duplicate
-            # If you want to keep cart-like behavior, remove the next two lines.
+            # clear previous draft items (optional)
             if order.items.exists():
                 order.items.all().delete()
                 order.total_price = Decimal('0.00')
@@ -285,44 +300,43 @@ def place_order(request):
                     messages.error(request, f"Not enough stock for {product.name}. Available: {product.stock}.")
                     continue
 
-                # Use the unit price from the DB (do NOT save the multiplied line price into price)
                 unit_price = Decimal(product.price)
-                # line_price is for computing totals & reducing stock only
                 line_price = (unit_price * qty).quantize(Decimal('0.01'))
 
-                # Save OrderItem with unit price (so future calculations do price * quantity correctly)
                 OrderItem.objects.create(
                     order=order,
                     product=product,
                     quantity=qty,
-                    price=unit_price,   # <-- store unit price, not line total
+                    price=unit_price,   # store unit price
                 )
 
-                # reduce stock and accumulate order total
-                product.stock -= qty
+                # decrement stock
+                product.stock = F('stock') - qty
                 product.save(update_fields=['stock'])
 
                 order_total += line_price
 
-            # finalize the order
+            # refresh product instances that used F() (optional)
+            for pid in selected_ids:
+                Product.objects.filter(pk=pid).update()  # no-op but ensures F() applied, or use refresh_from_db()
+
             order.total_price = order_total.quantize(Decimal('0.01'))
             order.is_paid = True
             order.save()
 
-        # Branch on which button was clicked:
         if action == 'save':
             messages.success(request, "Order saved! You can view it in the report.")
             return redirect('orders_report')
         elif action == 'print':
-            # render your existing print/view page, passing the order and its items
             return render(request, 'orders/view_order.html', {
                 'order': order,
                 'items': order.items.select_related('product'),
             })
 
-    # GET or fall-through
+    # GET or fall-through: pass 'query' so the template keeps the search value
     return render(request, 'orders/place_order.html', {
         'products': products,
+        'query': q,
     })
 
 

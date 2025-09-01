@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.db import models
 from django.contrib.auth.models import User
@@ -19,6 +20,8 @@ class Contact(models.Model):
     def __str__(self):
         return self.name
 
+def _low_stock_threshold():
+    return getattr(settings, "LOW_STOCK_THRESHOLD", 5)
 
 class Product(models.Model):
     image = models.ImageField(upload_to='product_images/', blank=True, null=True)
@@ -29,9 +32,16 @@ class Product(models.Model):
     stock = models.PositiveIntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    low_stock_notified = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        # compute threshold at runtime so we don't cause import-time issues
+        if self.stock >= _low_stock_threshold() and self.low_stock_notified:
+            self.low_stock_notified = False
+        super().save(*args, **kwargs)
 
 class Order(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
