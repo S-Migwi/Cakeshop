@@ -4,6 +4,9 @@ from django.db import models
 from django.contrib.auth.models import User
 from decimal import Decimal
 
+from django.db.models.expressions import CombinedExpression, F
+
+
 # Create your models here.
 
 class Contact(models.Model):
@@ -38,9 +41,14 @@ class Product(models.Model):
         return self.name
 
     def save(self, *args, **kwargs):
-        # compute threshold at runtime so we don't cause import-time issues
+        # If self.stock is an expression (F() or combined), fetch the real value first
+        if isinstance(self.stock, (F, CombinedExpression)) and self.pk:
+            # safe: only call when instance already saved
+            self.refresh_from_db(fields=['stock'])
+
         if self.stock >= _low_stock_threshold() and self.low_stock_notified:
             self.low_stock_notified = False
+
         super().save(*args, **kwargs)
 
 class Order(models.Model):

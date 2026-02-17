@@ -257,14 +257,9 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 
 def place_order(request):
-    # server-side search support (reads ?q=...)
     q = request.GET.get('q', '').strip()
-    if q:
-        products = Product.objects.filter(name__icontains=q)
-    else:
-        products = Product.objects.all()
+    products = Product.objects.filter(name__icontains=q) if q else Product.objects.all()
 
-    # Either get or start a new draft order
     order, created = Order.objects.get_or_create(
         user=request.user,
         is_paid=False,
@@ -279,7 +274,7 @@ def place_order(request):
             return redirect('place_order')
 
         with transaction.atomic():
-            # clear previous draft items (optional)
+            # clear previous draft items
             if order.items.exists():
                 order.items.all().delete()
                 order.total_price = Decimal('0.00')
@@ -287,7 +282,9 @@ def place_order(request):
             order_total = Decimal('0.00')
 
             for pid in selected_ids:
+                # get a fresh product instance (no locking here; we'll do conditional update)
                 product = get_object_or_404(Product, pk=pid)
+
                 try:
                     qty = int(request.POST.get(f'quantity_{pid}', 1))
                 except (ValueError, TypeError):
@@ -296,9 +293,17 @@ def place_order(request):
                 if qty < 1:
                     messages.error(request, f"Invalid quantity for {product.name}.")
                     continue
-                if product.stock < qty:
-                    messages.error(request, f"Not enough stock for {product.name}. Available: {product.stock}.")
+
+                # atomic conditional update: only decrement if stock >= qty
+                updated = Product.objects.filter(pk=product.pk, stock__gte=qty).update(stock=F('stock') - qty)
+
+                if not updated:
+                    # update returned 0 -> not enough stock or race lost
+                    messages.error(request, f"Not enough stock for {product.name}. Available (or changed): check inventory.")
                     continue
+
+                # At this point DB was updated. If you want to reflect new stock in the python instance:
+                product.refresh_from_db(fields=['stock'])
 
                 unit_price = Decimal(product.price)
                 line_price = (unit_price * qty).quantize(Decimal('0.01'))
@@ -307,19 +312,12 @@ def place_order(request):
                     order=order,
                     product=product,
                     quantity=qty,
-                    price=unit_price,   # store unit price
+                    price=unit_price,
                 )
-
-                # decrement stock
-                product.stock = F('stock') - qty
-                product.save(update_fields=['stock'])
 
                 order_total += line_price
 
-            # refresh product instances that used F() (optional)
-            for pid in selected_ids:
-                Product.objects.filter(pk=pid).update()  # no-op but ensures F() applied, or use refresh_from_db()
-
+            # finalize order
             order.total_price = order_total.quantize(Decimal('0.01'))
             order.is_paid = True
             order.save()
@@ -333,7 +331,6 @@ def place_order(request):
                 'items': order.items.select_related('product'),
             })
 
-    # GET or fall-through: pass 'query' so the template keeps the search value
     return render(request, 'orders/place_order.html', {
         'products': products,
         'query': q,
@@ -428,7 +425,7 @@ def generate_pdf(request):
                             topMargin=60, bottomMargin=40)
 
     styles = getSampleStyleSheet()
-    title = Paragraph("Product List Report", styles['Heading1'])
+    title = Paragraph("Products List Report", styles['Heading1'])
 
     # Table header
     data = [[

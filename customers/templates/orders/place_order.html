@@ -2,28 +2,53 @@
 
 {% block content %}
 <style>
+  /* Page layout adjustments: two-column responsive layout */
   .quantity-input {
-    font-size: 1.25rem;
-    padding: 0.5rem 0.75rem;
+    font-size: 1.1rem;
+    padding: 0.4rem 0.6rem;
   }
   .price-badge {
-    font-size: 1.25rem;
-    padding: 0.5em 0.75em;
+    font-size: 1.1rem;
+    padding: 0.35em 0.6em;
   }
-  .order-summary {
-    margin-top: 1rem;
+  .product-panel {
+    max-height: calc(100vh - 220px);
+    overflow-y: auto;
+    padding-right: 0.5rem;
+  }
+  .order-summary-card {
+    position: sticky;
+    top: 80px; /* keeps the summary visible while scrolling the product list */
   }
   .order-summary .total-input {
-    width: 150px;
+    width: 100%;
     text-align: right;
     font-weight: bold;
-    padding: 0.375rem 0.75rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 1.1rem;
   }
   .action-buttons {
     margin-top: 1rem;
     display: flex;
-    gap: 1rem;
+    gap: 0.75rem;
+    flex-wrap: wrap;
   }
+
+  /* Small screens: stack columns and remove sticky to prevent awkward behavior */
+  @media (max-width: 991.98px) {
+    .order-summary-card {
+      position: static;
+      top: auto;
+    }
+    .product-panel {
+      max-height: none;
+      overflow-y: visible;
+    }
+  }
+
+  /* subtle visual improvements */
+  .list-group-item { align-items: center; }
+  .search-bar { margin-bottom: 0.5rem; }
 </style>
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
@@ -52,11 +77,10 @@
 </nav>
 
 <div class="content">
-  <div class="container mt-5">
+  <div class="container mt-4">
     <h1 class="text-center mb-4">Place Order</h1>
 
-    <!-- SEARCH BAR: a GET form (server-side) + live client-side filtering -->
-    <form id="searchForm" method="get" class="mb-3">
+    <form id="searchForm" method="get" class="mb-3 search-bar">
       <div class="input-group">
         <input
           type="search"
@@ -76,34 +100,55 @@
       {% csrf_token %}
       <input type="hidden" name="action" id="actionField" value="">
 
-      <div class="mb-4">
-        <label class="form-label">Choose Products and Quantity</label>
-        <ul class="list-group" id="productList">
-          {% for product in products %}
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-              <div class="w-50">
-                <div class="form-check">
-                  <input class="form-check-input product-checkbox" type="checkbox" name="products" value="{{ product.id }}" id="prod_{{ product.id }}">
-                  <label class="form-check-label product-label" for="prod_{{ product.id }}">{{ product.name }} (In stock: {{ product.stock }})</label>
-                </div>
-              </div>
-              <div class="d-flex align-items-center">
-                <input type="number" name="quantity_{{ product.id }}" class="form-control form-control-sm me-2 quantity-input" value="1" min="1" max="{{ product.stock }}" disabled>
-                <span class="price-badge badge bg-primary rounded-pill fs-5">Kshs {{ product.price }}</span>
-              </div>
-            </li>
-          {% endfor %}
-        </ul>
-      </div>
+      <div class="row g-4">
+        <!-- LEFT: Product list (scrollable on larger screens) -->
+        <div class="col-lg-8">
+          <div class="card">
+            <div class="card-body product-panel p-2">
+              <label class="form-label ps-2">Choose Products and Quantity</label>
+              <ul class="list-group" id="productList">
+                {% for product in products %}
+                  <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div class="w-50">
+                      <div class="form-check">
+                        <input class="form-check-input product-checkbox" type="checkbox" name="products" value="{{ product.id }}" id="prod_{{ product.id }}">
+                        <label class="form-check-label product-label" for="prod_{{ product.id }}">{{ product.name }} <small class="text-muted">(In stock: {{ product.stock }})</small></label>
+                      </div>
+                    </div>
+                    <div class="d-flex align-items-center">
+                      <input type="number" name="quantity_{{ product.id }}" class="form-control form-control-sm me-2 quantity-input" value="1" min="1" max="{{ product.stock }}" disabled>
+                      <span class="price-badge badge bg-primary rounded-pill fs-6">Kshs {{ product.price }}</span>
+                    </div>
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+          </div>
+        </div>
 
-      <div class="order-summary">
-        <label class="form-label" for="totalField">Total Amount</label>
-        <input type="text" id="totalField" class="total-input" readonly>
-        <div class="action-buttons">
-          <button type="button" id="calculateBtn" class="btn btn-secondary">Calculate</button>
-          <button type="button" id="saveBtn" class="btn btn-success" disabled>Save</button>
-          <button type="button" id="printBtn" class="btn btn-primary" disabled>Print Receipt</button>
-          <button type="button" id="clearBtn" class="btn btn-warning">Clear</button>
+        <!-- RIGHT: Sticky order summary -->
+        <div class="col-lg-4">
+          <div class="card order-summary-card">
+            <div class="card-body">
+              <h5 class="card-title">Order Summary</h5>
+              <div class="order-summary">
+                <label class="form-label" for="totalField">Total Amount</label>
+                <input type="text" id="totalField" class="total-input form-control" readonly>
+
+                <div class="action-buttons">
+                  <button type="button" id="calculateBtn" class="btn btn-secondary">Calculate</button>
+                  <button type="button" id="saveBtn" class="btn btn-success" disabled>Save</button>
+                  <button type="button" id="printBtn" class="btn btn-primary" disabled>Print Receipt</button>
+                  <button type="button" id="clearBtn" class="btn btn-warning">Clear</button>
+                </div>
+
+                <hr>
+                <small class="text-muted">Tip: select products on the left. On smaller screens the summary stacks below the list.</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- optional quick actions or recent orders could go here -->
         </div>
       </div>
     </form>
@@ -125,7 +170,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const searchInput = document.getElementById('searchInput');
   const clearSearchBtn = document.getElementById('clearSearchBtn');
 
-  // Safety: if product list is empty, nothing to do
   if (!productListItems.length) {
     console.warn('product list is empty or selector changed (#productList li).');
   }
@@ -191,8 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     clearSearchBtn.addEventListener('click', () => {
       searchInput.value = '';
-      // If you want the server-side results cleared too, uncomment:
-      // document.getElementById('searchForm').submit();
+      // ensure server-side results cleared too by navigating to base path
       window.location.href = window.location.pathname;
       filterProductsLive('');
     });
@@ -264,8 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
     filterProductsLive(searchInput.value);
   }
 
-  // Helpful debug hint in console
-  console.info('Product list filter initialized — items:', productListItems.length);
+  console.info('Split layout initialized — items:', productListItems.length);
 });
 </script>
 
