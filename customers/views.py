@@ -1,25 +1,40 @@
 import io
 import os
+import requests
+import requests as http
+from datetime import timezone, datetime
 from decimal import Decimal
 from io import BytesIO
+from django.utils import timezone
 
+
+import base64,json
+
+from django.conf import settings
 from django.contrib.auth import authenticate,login as auth_login
 from django.contrib.auth.models import User
+
+from django.core.files.base import ContentFile
 from django.core.mail import mail_admins
 from django.db import transaction
+from django.views.decorators.csrf import csrf_exempt
+from requests.exceptions import RequestException
+from weasyprint import HTML
 from django.db.models import Sum, F, Count, ExpressionWrapper, DecimalField
 from django.db.models.functions import TruncDate, TruncMonth
-from django.http import HttpResponse, FileResponse
+from django.http import HttpResponse, FileResponse, JsonResponse, Http404
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+from django.template.loader import render_to_string
+from django.views.decorators.http import require_POST
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Table, TableStyle, Spacer
 
-from .models import Product, Order, OrderItem, Contact, Gallery, Supplier
-from .forms import ProductForm, OrderItemForm, ContactForm, SupplierForm, ProfitLossForm
+from .models import Product, Order, OrderItem, Contact, Gallery, Supplier, MpesaTransaction
+from .forms import ProductForm, ContactForm, SupplierForm, ProfitLossForm
 from django.contrib import messages
 
 
@@ -651,3 +666,131 @@ def orders_report_pdf(request):
     response['Content-Disposition'] = 'attachment; filename="orders_report.pdf"'
     return response
 
+def get_mpesa_token():
+    if settings.MPESA_ENV == 'sandbox':
+        oauth_url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
+    else:
+        oauth_url = 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
+    resp = requests.get(oauth_url, auth=(settings.MPESA_CONSUMER_KEY, settings.MPESA_CONSUMER_SECRET))
+    resp.raise_for_status()
+    return resp.json()['access_token']
+
+# Helper: password (BusinessShortCode+Passkey+Timestamp) base64
+def _stk_password(shortcode, passkey, timestamp):
+    raw = f"{shortcode}{passkey}{timestamp}"
+    return base64.b64encode(raw.encode()).decode()
+
+# Initiate STK push (AJAX POST from client)
+def initiate_stk_push(request, order_id):
+    """
+    POST payload (JSON or form): phone (e.g. 2547...), amount (decimal)
+    Returns JSON with status and checkoutRequestID if successful.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error':'POST required'}, status=400)
+
+    phone = request.POST.get('phone') or request.POST.get('msisdn')
+    amount = request.POST.get('amount')
+    if not phone or not amount:
+        return JsonResponse({'error':'phone and amount required'}, status=400)
+
+    order = get_object_or_404(Order, pk=order_id)
+
+    # create transaction record
+    txn = MpesaTransaction.objects.create(order=order, phone=phone, amount=amount, status='initiated')
+
+    # env-specific endpoints
+    if settings.MPESA_ENV == 'sandbox':
+        stk_url = 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest'
+    else:
+        stk_url = 'https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest'
+
+    # timestamp & password
+    timestamp = timezone.now().strftime('%Y%m%d%H%M%S')
+    password = _stk_password(settings.MPESA_SHORTCODE, settings.MPESA_PASSKEY, timestamp)
+
+    token = get_mpesa_token()
+    #if not token:
+    #    return JsonResponse({'status': 'error', 'detail': 'Failed to get MPESA token'}, status=500)
+
+    headers = { 'Authorization': f'Bearer {token}', 'Content-Type': 'application/json' }
+
+    payload = {
+        "BusinessShortCode": settings.MPESA_SHORTCODE,
+        "Password": password,
+        "Timestamp": timestamp,
+        "TransactionType": "CustomerPayBillOnline",
+        "Amount": str(amount),
+        "PartyA": phone,                 # msisdn paying (format 2547...)
+        "PartyB": settings.MPESA_SHORTCODE,  # recipient shortcode
+        "PhoneNumber": phone,
+        "CallBackURL": settings.MPESA_CALLBACK_URL,
+        "AccountReference": f"Order{order.id}",
+        "TransactionDesc": f"Payment for order {order.id}"
+    }
+
+    r = requests.post(stk_url, headers=headers, json=payload)
+    # record raw response
+    try:
+        r = http.post(stk_url, headers=headers, json=payload, timeout=15)
+        r.raise_for_status()
+        data = r.json()
+    except RequestException as exc:
+        txn.raw_response = {'error': str(exc)}
+        txn.status = 'failed'
+        txn.save()
+        return JsonResponse({'status': 'error', 'detail': str(exc)}, status=500)
+    txn.raw_response = data
+    # If request accepted, record CheckoutRequestID and set pending
+    if r.status_code == 200 and data.get('ResponseCode') in ('0', 0, '0'):
+        txn.checkout_request_id = data.get('CheckoutRequestID')
+        txn.status = 'pending'
+        txn.save()
+        return JsonResponse({'status':'ok','checkoutRequestID': txn.checkout_request_id, 'message': data.get('CustomerMessage')})
+    else:
+        txn.status = 'failed'
+        txn.save()
+        return JsonResponse({'status':'error','detail': data}, status=400)
+
+
+# Callback endpoint that M-Pesa will hit
+@csrf_exempt
+def mpesa_callback(request):
+    # Daraja sends JSON body
+    try:
+        payload = json.loads(request.body.decode('utf-8'))
+    except Exception:
+        payload = {}
+
+    # store payload and update transaction record if we can
+    # The structure typically: Body -> stkCallback -> CallbackMetadata -> Item[]
+    body = payload.get('Body') or {}
+    stk = body.get('stkCallback') or {}
+
+    checkout_id = stk.get('CheckoutRequestID')
+    result_code = stk.get('ResultCode')
+    result_desc = stk.get('ResultDesc')
+
+    # find transaction by checkoutRequestId
+    if checkout_id:
+        try:
+            txn = MpesaTransaction.objects.get(checkout_request_id=checkout_id)
+            txn.callback_payload = payload
+            if result_code == 0 or result_code == '0':
+                # success: extract MpesaReceipt number from CallbackMetadata
+                items = stk.get('CallbackMetadata', {}).get('Item', [])
+                mpesa_receipt = None
+                for it in items:
+                    if it.get('Name') == 'MpesaReceiptNumber':
+                        mpesa_receipt = it.get('Value')
+                txn.mpesa_receipt = mpesa_receipt
+                txn.status = 'success'
+            else:
+                txn.status = 'failure'
+            txn.save()
+        except MpesaTransaction.DoesNotExist:
+            # optionally create a record to log this orphan callback
+            MpesaTransaction.objects.create(phone='', amount=0, status='callback_orphan', callback_payload=payload)
+
+    # Daraja expects a 200 with a JSON acknowledgement
+    return JsonResponse({"ResultCode": 0, "ResultDesc": "Accepted"})

@@ -3,6 +3,7 @@ from django.db import models
 from django.db import models
 from django.contrib.auth.models import User
 from decimal import Decimal
+from django.utils import timezone
 
 from django.db.models.expressions import CombinedExpression, F
 
@@ -86,3 +87,17 @@ class Supplier(models.Model):
 
     def __str__(self):
         return self.name
+
+class MpesaTransaction(models.Model):
+    order = models.ForeignKey('customers.Order', on_delete=models.CASCADE, null=True, blank=True)
+    phone = models.CharField(max_length=20)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    checkout_request_id = models.CharField(max_length=80, blank=True, null=True)
+    mpesa_receipt = models.CharField(max_length=80, blank=True, null=True)
+    status = models.CharField(max_length=30, default='initiated')  # initiated/pending/success/failure
+    raw_response = models.JSONField(null=True, blank=True)
+    callback_payload = models.JSONField(null=True, blank=True)
+    created = models.DateTimeField(auto_now_add=True)
+    updated = models.DateTimeField(auto_now=True)
+    def __str__(self):
+        return f"MpesaTxn {self.id} {self.phone} {self.amount} {self.status}"

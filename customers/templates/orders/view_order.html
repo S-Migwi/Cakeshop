@@ -1,136 +1,117 @@
-{% extends 'base.html' %}
-
-{% block content %}
-<div class="content">
-    <div class="container mt-5">
-        <!-- Screen View -->
-        <h2 class="text-center mb-4 screen-only">Order Summary</h2>
-
-        <div class="card mb-4 screen-only">
-            <div class="card-header bg-primary text-white d-flex justify-content-between">
-                <h5>Order Details</h5>
-                <div>
-                    <a href="{% url 'edit_order' order.id %}" class="btn btn-warning btn-sm">Edit</a>
-                    <a href="{% url 'delete_order' order.id %}" class="btn btn-danger btn-sm">Delete</a>
-                </div>
-            </div>
-        </div>
-
-        <!-- Printable Receipt -->
-        <div id="receipt">
-            <div class="receipt-content">
-                <div class="receipt-header">
-                    <h3>Cakes By Brenda</h3>
-                    <p>Mbaria Kaniu Road, Naivasha<br>
-                    Tel: +254 721462341</p>
-                </div>
-
-                <div class="receipt-body">
-                    <div class="receipt-row">
-                        <span>Order ID:</span>
-                        <span>{{ order.id }}</span>
-                    </div>
-                    <div class="receipt-row">
-                      <span>Date:</span>
-                      <span id="client-date">--/--/---- --:-- --</span>
-                    </div>
-
-
-                    <div class="receipt-divider"></div>
-
-                    <div class="receipt-table">
-                        <div class="table-header">
-                            <span>Item</span>
-                            <span>Qty</span>
-                            <span>Price</span>
-                        </div>
-                        {% for item in order.items.all %}
-                        <div class="table-row">
-                            <span>{{ item.product.name|truncatechars:20 }}</span>
-                            <span>{{ item.quantity }}</span>
-                            <span>Ksh {{ item.price|floatformat:2 }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-
-                    <div class="receipt-divider"></div>
-
-                    <div class="receipt-total">
-                        <span>Total:</span>
-                        <span>Ksh {{ order.total_price|floatformat:2 }}</span>
-                    </div>
-
-                    <div class="receipt-footer">
-                        <p>Thank you for your order!<br>
-                        Visit again soon.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="text-center mt-3 screen-only">
-            <button onclick="window.print()" class="btn btn-secondary">Print Receipt</button>
+{% extends 'base.html' %} {% block content %}
+<div class="content"> <div class="container mt-5">
+    <!-- Screen View -->
+    <h2 class="text-center mb-4 screen-only">Order Summary</h2>
+    <div class="card mb-4 screen-only"> <div class="card-header bg-primary text-white d-flex justify-content-between">
+        <h5>Order Details</h5>
+        <div>
+            <a href="{% url 'edit_order' order.id %}" class="btn btn-warning btn-sm">Edit</a>
+            <a href="{% url 'delete_order' order.id %}" class="btn btn-danger btn-sm">Delete</a>
         </div>
     </div>
-</div>
+    </div>
+    <!-- Printable Receipt -->
+    <div id="receipt">
+        <div class="receipt-content">
+            <div class="receipt-header">
+                <h3>Cakes By Brenda</h3>
+                <p>Mbaria Kaniu Road, Naivasha<br> Tel: +254 721462341</p>
+            </div> <div class="receipt-body">
+            <div class="receipt-row">
+                <span>Order ID:</span>
+                <span>{{ order.id }}</span>
+            </div> <div class="receipt-row">
+            <span>Date:</span>
+            <span id="client-date">--/--/---- --:-- --</span>
+        </div>
+            <div class="receipt-divider"></div>
+            <div class="receipt-table">
+                <div class="table-header">
+                    <span>Item</span>
+                    <span>Qty</span>
+                    <span>Price</span>
+                </div> {% for item in order.items.all %}
+                <div class="table-row">
+                    <span>{{ item.product.name|truncatechars:20 }}</span>
+                    <span>{{ item.quantity }}</span>
+                    <span>Ksh {{ item.price|floatformat:2 }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="receipt-divider"></div>
+            <div class="receipt-total">
+                <span>Total:</span>
+                <span>Ksh {{ order.total_price|floatformat:2 }}</span>
+            </div> <div class="receipt-footer">
+            <p>Thank you for your order!<br> Visit again soon.</p>
+        </div>
+        </div>
+        </div>
+    </div>
+    <div class="text-center mt-3 screen-only">
+        <button onclick="window.print()" class="btn btn-secondary">Print Receipt</button>
+    </div>
+    <!-- Payment area -->
+    <div class="text-center mt-3 screen-only">
+      <input id="mpesa-phone" placeholder="2547XXXXXXXX" value="" />
+      <input id="mpesa-amount" placeholder="Amount" value="{{ order.total_price|floatformat:0 }}" />
+      <button id="mpesa-pay" class="btn btn-success">Pay with M-Pesa</button>
+    </div>
 
+</div>
+</div>
 <style>
     /* Screen Styles */
-    .screen-only { display: block; }
-    .receipt-content {
-        max-width: 80mm;
-        margin: 0 auto;
-        padding: 20px;
-        background: #fff;
-        border-radius: 8px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-
+    .screen-only {
+        display: block;
+    } .receipt-content {
+              max-width: 80mm;
+              margin: 0 auto;
+              padding: 20px;
+              background: #fff;
+              border-radius: 8px;
+              box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+          }
     .receipt-header {
         text-align: center;
         margin-bottom: 1rem;
     }
-
     .receipt-header h3 {
         margin: 0 0 0.5rem 0;
         color: #2c3e50;
     }
-
     .receipt-row {
         display: flex;
         justify-content: space-between;
         margin: 0.5rem 0;
     }
-
     .receipt-divider {
         border-bottom: 1px dashed #ddd;
         margin: 1rem 0;
     }
-
     .table-header {
         display: flex;
         justify-content: space-between;
         font-weight: bold;
         margin-bottom: 0.5rem;
     }
-
     .table-row {
         display: flex;
         justify-content: space-between;
         margin: 0.3rem 0;
     }
-
     /* Print Styles */
     @media print {
         /* Add this rule to hide footer */
-        footer, .footer, .site-footer {
+        footer,
+        .footer,
+        .site-footer {
             display: none !important;
         }
         @page {
             size: auto;
             margin: 5mm;
         }
-
         body {
             background: white !important;
             font-family: 'Courier New', monospace !important;
@@ -139,35 +120,29 @@
         .screen-only {
             display: none !important;
         }
-
         #receipt {
             width: 80mm !important;
             margin: 0 auto !important;
             padding: 0 !important;
             box-shadow: none !important;
         }
-
         .receipt-content {
             all: initial !important;
             font-family: inherit !important;
             font-size: inherit !important;
         }
-
         .receipt-header h3 {
             font-size: 16pt !important;
             text-align: center !important;
         }
-
         .table-header span,
         .table-row span {
             width: 33%;
             display: inline-block;
         }
-
         .receipt-divider {
             border-bottom: 2px dashed #000 !important;
         }
-
         .receipt-footer {
             text-align: center !important;
             margin-top: 1rem !important;
@@ -175,22 +150,54 @@
     }
 </style>
 <script>
-  document.addEventListener('DOMContentLoaded', function() {
-    // Use the browser's locale to format date + time
-    const now = new Date();
-    // e.g. "Jul 14, 2025, 4:23 PM"
-    const formatted = now.toLocaleString(undefined, {
-      month: 'short',
-      day:   '2-digit',
-      year:  'numeric',
-      hour:         'numeric',
-      minute:       '2-digit',
-      hour12:       true
+    document.addEventListener('DOMContentLoaded', function()
+    {
+        // Use the browser's locale to format date + time
+        const now = new Date();
+        // e.g. "Jul 14, 2025, 4:23 PM"
+        const formatted = now.toLocaleString(undefined, {
+            month: 'short',
+            day: '2-digit',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        });
+        const el = document.getElementById('client-date');
+        if (el) el.textContent = formatted;
     });
+    document.getElementById('mpesa-pay').addEventListener('click', function(e) {
+      e.preventDefault();
+      const phone = document.getElementById('mpesa-phone').value.trim();
+      const amount = document.getElementById('mpesa-amount').value.trim();
+      if (!phone || !amount) { alert('Enter phone and amount'); return; }
 
-    const el = document.getElementById('client-date');
-    if (el) el.textContent = formatted;
-  });
+      const url = "{% url 'mpesa_stk_push' order.id %}";
+      const csrftoken = (function(){ // simplistic getCookie
+        const name='csrftoken='; const ca = document.cookie.split(';');
+        for (let c of ca) { c=c.trim(); if (c.startsWith(name)) return decodeURIComponent(c.substring(name.length)); }
+        return '';
+      })();
+
+      const fd = new FormData();
+      fd.append('phone', phone);
+      fd.append('amount', amount);
+
+      fetch(url, {
+        method: 'POST',
+        headers: {'X-CSRFToken': csrftoken},
+        body: fd
+      }).then(r => r.json())
+        .then(data => {
+          if (data.status === 'ok') {
+            alert('STK Push sent. Check phone for prompt.\n' + (data.message || ''));
+          } else {
+            alert('Error initiating payment: ' + JSON.stringify(data));
+          }
+        }).catch(err => {
+          console.error(err); alert('Network error');
+        });
+});
 </script>
-
 {% endblock %}
+

@@ -35,11 +35,11 @@ DEBUG = True
 ALLOWED_HOSTS = [
     '127.0.0.1',
     'localhost',
-    'c0ad1fcd55bb.ngrok-free.app',
+    'f732-102-219-208-62.ngrok-free.app',
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    'https://c0ad1fcd55bb.ngrok-free.app',
+    'https://f732-102-219-208-62.ngrok-free.app',
 ]
 
 
@@ -101,6 +101,16 @@ DATABASES = {
     }
 }
 
+# settings.py (add)
+MPESA_ENV = 'sandbox'   # or 'production'
+MPESA_CONSUMER_KEY = 'IKcbTk30xyhY3efvaFLjF220VIQHQF71P6qcRDDjQaZ8DG7F'
+MPESA_CONSUMER_SECRET = 'UC72WEGkA0GEW7x0WhOewbaEtRCqAhzQoj95GzMPsgd47AfAJ4QyvUt4Xo3xahkn'
+MPESA_SHORTCODE = '174379'     # e.g. 174379 for sandbox
+MPESA_SHORTCODE_TYPE = 'Paybill'
+MPESA_PASSKEY = 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919'
+MPESA_CALLBACK_URL ='https://f732-102-219-208-62.ngrok-free.app'
+MPESA_INITIATOR_USERNAME = 'testapi' #InitiatorName on the test credentials in the simulator
+MPESA_INITIATOR_SECURITY_CREDENTIALS = 'Safaricom123!!'#Initiator password in the test credentials
 
 
 # Password validation
