@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>CSIMS</title>
+  <title>Cakes by Brenda</title>
 
   {% load static %}
 
@@ -96,13 +96,16 @@
           <a class="nav-link px-2 text-white" href="{% url 'product_gallery' %}">Products</a>
         </li>
       </ul>
-      <p class="mb-0">© 2025 Cakes by Brenda Ltd</p>
+      <p id="copyright" class="mb-0">© 2025 Cakes by Brenda Ltd</p>
     </div>
   </footer>
 
   <!-- 6. Bootstrap JS (with Popper) -->
   <script src="{% static 'style/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
   <script>
+    const el = document.getElementById('copyright');
+    const now = new Date();
+    el.textContent = `© ${now.getFullYear()} Cakes by Brenda Ltd`;
     document.addEventListener('DOMContentLoaded', function() {
       // Find all dismissible alerts
       const alerts = document.querySelectorAll('.alert-dismissible');

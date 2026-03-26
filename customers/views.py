@@ -2,7 +2,6 @@ import io
 import os
 import requests
 import requests as http
-from datetime import timezone, datetime
 from decimal import Decimal
 from io import BytesIO
 from django.utils import timezone
@@ -33,7 +32,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Table, TableStyle, Spacer
 
-from .models import Product, Order, OrderItem, Contact, Gallery, Supplier, MpesaTransaction
+from .models import Product, Order, OrderItem, Contact, Gallery, Supplier, MpesaTransaction, MpesaPayment
 from .forms import ProductForm, ContactForm, SupplierForm, ProfitLossForm
 from django.contrib import messages
 
@@ -273,6 +272,10 @@ from django.contrib import messages
 
 def place_order(request):
     q = request.GET.get('q', '').strip()
+
+    # keep selected items across search reloads
+    selected_ids = request.GET.getlist('selected')
+
     products = Product.objects.filter(name__icontains=q) if q else Product.objects.all()
 
     order, created = Order.objects.get_or_create(
@@ -284,71 +287,119 @@ def place_order(request):
     if request.method == 'POST':
         action = request.POST.get('action')
         selected_ids = request.POST.getlist('products')
+
         if not selected_ids:
             messages.error(request, "Please select at least one product.")
             return redirect('place_order')
 
-        with transaction.atomic():
-            # clear previous draft items
-            if order.items.exists():
-                order.items.all().delete()
-                order.total_price = Decimal('0.00')
+        requested = {}
+        for pid in selected_ids:
+            product = get_object_or_404(Product, pk=pid)
+            try:
+                qty = int(request.POST.get(f'quantity_{pid}', 1))
+            except (ValueError, TypeError):
+                qty = 1
 
-            order_total = Decimal('0.00')
+            if qty < 1:
+                messages.error(request, f"Invalid quantity for {product.name}.")
+                return redirect('place_order')
 
-            for pid in selected_ids:
-                # get a fresh product instance (no locking here; we'll do conditional update)
-                product = get_object_or_404(Product, pk=pid)
+            requested[product.pk] = {
+                'product': product,
+                'qty': qty,
+                'unit_price': Decimal(product.price)
+            }
 
-                try:
-                    qty = int(request.POST.get(f'quantity_{pid}', 1))
-                except (ValueError, TypeError):
-                    qty = 1
+        if action == 'print':
+            try:
+                with transaction.atomic():
+                    if order.items.exists():
+                        order.items.all().delete()
+                        order.total_price = Decimal('0.00')
 
-                if qty < 1:
-                    messages.error(request, f"Invalid quantity for {product.name}.")
-                    continue
+                    order_total = Decimal('0.00')
+                    for entry in requested.values():
+                        line_price = (entry['unit_price'] * entry['qty']).quantize(Decimal('0.01'))
+                        OrderItem.objects.create(
+                            order=order,
+                            product=entry['product'],
+                            quantity=entry['qty'],
+                            price=entry['unit_price'],
+                        )
+                        order_total += line_price
 
-                # atomic conditional update: only decrement if stock >= qty
-                updated = Product.objects.filter(pk=product.pk, stock__gte=qty).update(stock=F('stock') - qty)
+                    order.total_price = order_total.quantize(Decimal('0.01'))
+                    order.save()
 
-                if not updated:
-                    # update returned 0 -> not enough stock or race lost
-                    messages.error(request, f"Not enough stock for {product.name}. Available (or changed): check inventory.")
-                    continue
+                return render(request, 'orders/view_order.html', {
+                    'order': order,
+                    'items': order.items.select_related('product'),
+                })
+            except Exception:
+                messages.error(request, "Could not prepare preview. Please try again.")
+                return redirect('place_order')
 
-                # At this point DB was updated. If you want to reflect new stock in the python instance:
-                product.refresh_from_db(fields=['stock'])
+        elif action == 'save':
+            try:
+                with transaction.atomic():
+                    existing_items = {oi.product_id: oi for oi in order.items.select_related('product').all()}
+                    seen_product_ids = set()
+                    order_total = Decimal('0.00')
 
-                unit_price = Decimal(product.price)
-                line_price = (unit_price * qty).quantize(Decimal('0.01'))
+                    for pid, entry in requested.items():
+                        product = entry['product']
+                        new_qty = entry['qty']
+                        unit_price = entry['unit_price']
+                        seen_product_ids.add(pid)
 
-                OrderItem.objects.create(
-                    order=order,
-                    product=product,
-                    quantity=qty,
-                    price=unit_price,
-                )
+                        existing_oi = existing_items.get(pid)
+                        existing_qty = existing_oi.quantity if existing_oi else 0
+                        delta = new_qty - existing_qty
 
-                order_total += line_price
+                        if delta > 0:
+                            updated = Product.objects.filter(pk=product.pk, stock__gte=delta).update(stock=F('stock') - delta)
+                            if not updated:
+                                raise ValueError(f"Not enough stock for {product.name}.")
+                        elif delta < 0:
+                            Product.objects.filter(pk=product.pk).update(stock=F('stock') + (-delta))
 
-            # finalize order
-            order.total_price = order_total.quantize(Decimal('0.01'))
-            order.is_paid = True
-            order.save()
+                        if existing_oi:
+                            existing_oi.quantity = new_qty
+                            existing_oi.price = unit_price
+                            existing_oi.save()
+                        else:
+                            OrderItem.objects.create(order=order, product=product, quantity=new_qty, price=unit_price)
 
-        if action == 'save':
-            messages.success(request, "Order saved! You can view it in the report.")
-            return redirect('orders_report')
-        elif action == 'print':
-            return render(request, 'orders/view_order.html', {
-                'order': order,
-                'items': order.items.select_related('product'),
-            })
+                        order_total += (unit_price * new_qty).quantize(Decimal('0.01'))
+
+                    removed_product_ids = set(existing_items.keys()) - seen_product_ids
+                    for removed_pid in removed_product_ids:
+                        removed_oi = existing_items[removed_pid]
+                        Product.objects.filter(pk=removed_oi.product.pk).update(stock=F('stock') + removed_oi.quantity)
+                        removed_oi.delete()
+
+                    order.total_price = order_total.quantize(Decimal('0.01'))
+                    order.is_paid = True
+                    order.save()
+
+                messages.success(request, "Order saved and stock updated.")
+                return redirect('place_order')
+
+            except ValueError as exc:
+                messages.error(request, str(exc))
+                return redirect('place_order')
+            except Exception:
+                messages.error(request, "Could not save order. Please try again.")
+                return redirect('place_order')
+
+        else:
+            messages.error(request, "Unknown action.")
+            return redirect('place_order')
 
     return render(request, 'orders/place_order.html', {
         'products': products,
         'query': q,
+        'selected_ids': selected_ids,
     })
 
 
@@ -671,49 +722,49 @@ def get_mpesa_token():
         oauth_url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
     else:
         oauth_url = 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
-    resp = requests.get(oauth_url, auth=(settings.MPESA_CONSUMER_KEY, settings.MPESA_CONSUMER_SECRET))
+
+    resp = requests.get(
+        oauth_url,
+        auth=(settings.MPESA_CONSUMER_KEY, settings.MPESA_CONSUMER_SECRET)
+    )
     resp.raise_for_status()
     return resp.json()['access_token']
 
-# Helper: password (BusinessShortCode+Passkey+Timestamp) base64
+
 def _stk_password(shortcode, passkey, timestamp):
     raw = f"{shortcode}{passkey}{timestamp}"
     return base64.b64encode(raw.encode()).decode()
 
-# Initiate STK push (AJAX POST from client)
-def initiate_stk_push(request, order_id):
-    """
-    POST payload (JSON or form): phone (e.g. 2547...), amount (decimal)
-    Returns JSON with status and checkoutRequestID if successful.
-    """
-    if request.method != 'POST':
-        return JsonResponse({'error':'POST required'}, status=400)
 
-    phone = request.POST.get('phone') or request.POST.get('msisdn')
-    amount = request.POST.get('amount')
-    if not phone or not amount:
-        return JsonResponse({'error':'phone and amount required'}, status=400)
-
+@require_POST
+def mpesa_stk_push(request, order_id):
     order = get_object_or_404(Order, pk=order_id)
+    phone = request.POST.get('phone')
+    amount = request.POST.get('amount')
 
-    # create transaction record
-    txn = MpesaTransaction.objects.create(order=order, phone=phone, amount=amount, status='initiated')
+    if not phone or not amount:
+        return JsonResponse({'status': 'error', 'detail': 'phone and amount required'}, status=400)
 
-    # env-specific endpoints
+    txn = MpesaTransaction.objects.create(
+        order=order,
+        phone=phone,
+        amount=Decimal(amount),
+        status='initiated'
+    )
+
     if settings.MPESA_ENV == 'sandbox':
         stk_url = 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest'
     else:
         stk_url = 'https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest'
 
-    # timestamp & password
     timestamp = timezone.now().strftime('%Y%m%d%H%M%S')
     password = _stk_password(settings.MPESA_SHORTCODE, settings.MPESA_PASSKEY, timestamp)
-
     token = get_mpesa_token()
-    #if not token:
-    #    return JsonResponse({'status': 'error', 'detail': 'Failed to get MPESA token'}, status=500)
 
-    headers = { 'Authorization': f'Bearer {token}', 'Content-Type': 'application/json' }
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
 
     payload = {
         "BusinessShortCode": settings.MPESA_SHORTCODE,
@@ -721,76 +772,94 @@ def initiate_stk_push(request, order_id):
         "Timestamp": timestamp,
         "TransactionType": "CustomerPayBillOnline",
         "Amount": str(amount),
-        "PartyA": phone,                 # msisdn paying (format 2547...)
-        "PartyB": settings.MPESA_SHORTCODE,  # recipient shortcode
+        "PartyA": phone,
+        "PartyB": settings.MPESA_SHORTCODE,
         "PhoneNumber": phone,
         "CallBackURL": settings.MPESA_CALLBACK_URL,
         "AccountReference": f"Order{order.id}",
         "TransactionDesc": f"Payment for order {order.id}"
     }
 
-    r = requests.post(stk_url, headers=headers, json=payload)
-    # record raw response
     try:
-        r = http.post(stk_url, headers=headers, json=payload, timeout=15)
-        r.raise_for_status()
-        data = r.json()
-    except RequestException as exc:
-        txn.raw_response = {'error': str(exc)}
+        resp = requests.post(stk_url, headers=headers, json=payload, timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
+    except requests.RequestException as exc:
         txn.status = 'failed'
+        txn.raw_response = {'error': str(exc)}
         txn.save()
         return JsonResponse({'status': 'error', 'detail': str(exc)}, status=500)
+
     txn.raw_response = data
-    # If request accepted, record CheckoutRequestID and set pending
-    if r.status_code == 200 and data.get('ResponseCode') in ('0', 0, '0'):
+
+    if data.get('ResponseCode') == '0':
         txn.checkout_request_id = data.get('CheckoutRequestID')
+        txn.merchant_request_id = data.get('MerchantRequestID')
         txn.status = 'pending'
         txn.save()
-        return JsonResponse({'status':'ok','checkoutRequestID': txn.checkout_request_id, 'message': data.get('CustomerMessage')})
-    else:
-        txn.status = 'failed'
-        txn.save()
-        return JsonResponse({'status':'error','detail': data}, status=400)
+        return JsonResponse({
+            'status': 'ok',
+            'message': data.get('CustomerMessage', 'STK Push sent'),
+            'checkout_request_id': txn.checkout_request_id
+        })
+
+    txn.status = 'failed'
+    txn.save()
+    return JsonResponse({'status': 'error', 'detail': data}, status=400)
 
 
-# Callback endpoint that M-Pesa will hit
 @csrf_exempt
+@require_POST
 def mpesa_callback(request):
-    # Daraja sends JSON body
     try:
-        payload = json.loads(request.body.decode('utf-8'))
+        payload = json.loads(request.body.decode("utf-8"))
     except Exception:
-        payload = {}
+        return JsonResponse({"ResultCode": 1, "ResultDesc": "Invalid JSON"})
 
-    # store payload and update transaction record if we can
-    # The structure typically: Body -> stkCallback -> CallbackMetadata -> Item[]
-    body = payload.get('Body') or {}
-    stk = body.get('stkCallback') or {}
+    stk = payload.get("Body", {}).get("stkCallback", {})
+    checkout_id = stk.get("CheckoutRequestID")
+    result_code = stk.get("ResultCode")
+    result_desc = stk.get("ResultDesc", "")
 
-    checkout_id = stk.get('CheckoutRequestID')
-    result_code = stk.get('ResultCode')
-    result_desc = stk.get('ResultDesc')
+    txn = MpesaTransaction.objects.filter(checkout_request_id=checkout_id).first()
+    if txn:
+        txn.callback_payload = payload
+        txn.result_code = str(result_code)
+        txn.result_desc = result_desc
 
-    # find transaction by checkoutRequestId
-    if checkout_id:
-        try:
-            txn = MpesaTransaction.objects.get(checkout_request_id=checkout_id)
-            txn.callback_payload = payload
-            if result_code == 0 or result_code == '0':
-                # success: extract MpesaReceipt number from CallbackMetadata
-                items = stk.get('CallbackMetadata', {}).get('Item', [])
-                mpesa_receipt = None
-                for it in items:
-                    if it.get('Name') == 'MpesaReceiptNumber':
-                        mpesa_receipt = it.get('Value')
-                txn.mpesa_receipt = mpesa_receipt
-                txn.status = 'success'
-            else:
-                txn.status = 'failure'
-            txn.save()
-        except MpesaTransaction.DoesNotExist:
-            # optionally create a record to log this orphan callback
-            MpesaTransaction.objects.create(phone='', amount=0, status='callback_orphan', callback_payload=payload)
+        if str(result_code) == "0":
+            items = stk.get("CallbackMetadata", {}).get("Item", [])
+            meta = {item.get("Name"): item.get("Value") for item in items}
 
-    # Daraja expects a 200 with a JSON acknowledgement
+            txn.mpesa_receipt = meta.get("MpesaReceiptNumber", "")
+            txn.phone = str(meta.get("PhoneNumber", txn.phone))
+            if meta.get("Amount") is not None:
+                txn.amount = Decimal(str(meta.get("Amount")))
+            txn.status = "success"
+        else:
+            txn.status = "failed"
+
+        txn.save()
+
     return JsonResponse({"ResultCode": 0, "ResultDesc": "Accepted"})
+
+
+def mpesa_payment_status(request, order_id):
+    txn = MpesaTransaction.objects.filter(order__id=order_id).order_by('-id').first()
+
+    if not txn:
+        return JsonResponse({
+            "status": "pending",
+            "receipt_number": "",
+            "amount": "",
+            "phone_number": "",
+            "recipient_name": "Cakes By Brenda",
+        })
+
+    return JsonResponse({
+        "status": txn.status,
+        "receipt_number": getattr(txn, "mpesa_receipt", "") or "",
+        "amount": str(txn.amount) if txn.amount is not None else "",
+        "phone_number": getattr(txn, "phone", "") or "",
+        "recipient_name": "Cakes By Brenda",
+    })

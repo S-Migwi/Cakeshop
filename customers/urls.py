@@ -91,7 +91,9 @@ urlpatterns = [
         ),
         name='password_reset_complete'
     ),
-    path('orders/<int:order_id>/mpesa/stk_push/', views.initiate_stk_push, name='mpesa_stk_push'),
+    path('orders/<int:order_id>/mpesa/stk_push/', views.mpesa_stk_push, name='mpesa_stk_push'),
     path('mpesa/callback/', views.mpesa_callback, name='mpesa_callback'),
+    path("orders/<int:order_id>/mpesa/status/", views.mpesa_payment_status, name="mpesa_payment_status"),
+
 
 ]

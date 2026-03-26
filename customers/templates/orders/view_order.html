@@ -1,203 +1,386 @@
-{% extends 'base.html' %} {% block content %}
-<div class="content"> <div class="container mt-5">
-    <!-- Screen View -->
+{% extends 'base.html' %}
+{% block content %}
+<div class="content">
+  <div class="container mt-5">
     <h2 class="text-center mb-4 screen-only">Order Summary</h2>
-    <div class="card mb-4 screen-only"> <div class="card-header bg-primary text-white d-flex justify-content-between">
+
+    <div class="card mb-4 screen-only">
+      <div class="card-header bg-primary text-white d-flex justify-content-between">
         <h5>Order Details</h5>
         <div>
-            <a href="{% url 'edit_order' order.id %}" class="btn btn-warning btn-sm">Edit</a>
-            <a href="{% url 'delete_order' order.id %}" class="btn btn-danger btn-sm">Delete</a>
+          <a href="{% url 'edit_order' order.id %}" class="btn btn-warning btn-sm">Edit</a>
+          <a href="{% url 'delete_order' order.id %}" class="btn btn-danger btn-sm">Delete</a>
         </div>
+      </div>
     </div>
-    </div>
+
     <!-- Printable Receipt -->
     <div id="receipt">
-        <div class="receipt-content">
-            <div class="receipt-header">
-                <h3>Cakes By Brenda</h3>
-                <p>Mbaria Kaniu Road, Naivasha<br> Tel: +254 721462341</p>
-            </div> <div class="receipt-body">
-            <div class="receipt-row">
-                <span>Order ID:</span>
-                <span>{{ order.id }}</span>
-            </div> <div class="receipt-row">
+      <div class="receipt-content">
+        <div class="receipt-header">
+          <h3>Cakes By Brenda</h3>
+          <p>Mbaria Kaniu Road, Naivasha<br> Tel: +254 721462341</p>
+        </div>
+
+        <div class="receipt-body">
+          <div class="receipt-row">
+            <span>Order ID:</span>
+            <span>{{ order.id }}</span>
+          </div>
+
+          <div class="receipt-row">
             <span>Date:</span>
             <span id="client-date">--/--/---- --:-- --</span>
-        </div>
-            <div class="receipt-divider"></div>
-            <div class="receipt-table">
-                <div class="table-header">
-                    <span>Item</span>
-                    <span>Qty</span>
-                    <span>Price</span>
-                </div> {% for item in order.items.all %}
-                <div class="table-row">
-                    <span>{{ item.product.name|truncatechars:20 }}</span>
-                    <span>{{ item.quantity }}</span>
-                    <span>Ksh {{ item.price|floatformat:2 }}</span>
-                </div>
-                {% endfor %}
+          </div>
+
+          <div class="receipt-divider"></div>
+
+          <div class="receipt-table">
+            <div class="table-header">
+              <span>Item</span>
+              <span>Qty</span>
+              <span>Price</span>
             </div>
-            <div class="receipt-divider"></div>
-            <div class="receipt-total">
-                <span>Total:</span>
-                <span>Ksh {{ order.total_price|floatformat:2 }}</span>
-            </div> <div class="receipt-footer">
+
+            {% for item in order.items.all %}
+            <div class="table-row">
+              <span>{{ item.product.name|truncatechars:20 }}</span>
+              <span>{{ item.quantity }}</span>
+              <span>Ksh {{ item.price|floatformat:2 }}</span>
+            </div>
+            {% endfor %}
+          </div>
+
+          <div class="receipt-divider"></div>
+
+          <div class="receipt-total">
+            <span>Total:</span>
+            <span>Ksh {{ order.total_price|floatformat:2 }}</span>
+          </div>
+
+          <div class="receipt-footer">
             <p>Thank you for your order!<br> Visit again soon.</p>
+          </div>
         </div>
-        </div>
-        </div>
-    </div>
-    <div class="text-center mt-3 screen-only">
-        <button onclick="window.print()" class="btn btn-secondary">Print Receipt</button>
-    </div>
-    <!-- Payment area -->
-    <div class="text-center mt-3 screen-only">
-      <input id="mpesa-phone" placeholder="2547XXXXXXXX" value="" />
-      <input id="mpesa-amount" placeholder="Amount" value="{{ order.total_price|floatformat:0 }}" />
-      <button id="mpesa-pay" class="btn btn-success">Pay with M-Pesa</button>
+      </div>
     </div>
 
+    <div class="text-center mt-3 screen-only">
+      <button onclick="window.print()" class="btn btn-secondary">Print Receipt</button>
+    </div>
+
+    <div class="text-center mt-3 screen-only">
+      <input id="mpesa-phone" class="form-control d-inline-block w-auto mb-2" placeholder="2547XXXXXXXX" value="" />
+      <input id="mpesa-amount" class="form-control d-inline-block w-auto mb-2" placeholder="Amount" value="{{ order.total_price|floatformat:0 }}" />
+      <button id="mpesa-pay" class="btn btn-success mb-2">Pay with M-Pesa</button>
+    </div>
+  </div>
 </div>
+
+<!-- Success Modal -->
+<div class="modal fade" id="mpesaSuccessModal" tabindex="-1" aria-labelledby="mpesaSuccessModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title" id="mpesaSuccessModalLabel">Payment Successful</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2"><strong>Recipient:</strong> <span id="successRecipient">-</span></p>
+        <p class="mb-2"><strong>M-Pesa Code:</strong> <span id="successCode">-</span></p>
+        <p class="mb-0"><strong>Amount:</strong> <span id="successAmount">-</span></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-success" data-bs-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
 </div>
+
 <style>
-    /* Screen Styles */
+  .screen-only {
+    display: block;
+  }
+
+  .receipt-content {
+    max-width: 80mm;
+    margin: 0 auto;
+    padding: 20px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  }
+
+  .receipt-header {
+    text-align: center;
+    margin-bottom: 1rem;
+  }
+
+  .receipt-header h3 {
+    margin: 0 0 0.5rem 0;
+    color: #2c3e50;
+  }
+
+  .receipt-row {
+    display: flex;
+    justify-content: space-between;
+    margin: 0.5rem 0;
+  }
+
+  .receipt-divider {
+    border-bottom: 1px dashed #ddd;
+    margin: 1rem 0;
+  }
+
+  .table-header {
+    display: flex;
+    justify-content: space-between;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+  }
+
+  .table-row {
+    display: flex;
+    justify-content: space-between;
+    margin: 0.3rem 0;
+  }
+
+  .receipt-total {
+    display: flex;
+    justify-content: space-between;
+    font-weight: bold;
+    margin-top: 0.5rem;
+  }
+
+  .receipt-footer {
+    text-align: center;
+    margin-top: 1rem;
+  }
+
+  @media print {
+    footer,
+    .footer,
+    .site-footer {
+      display: none !important;
+    }
+
+    @page {
+      size: auto;
+      margin: 5mm;
+    }
+
+    body {
+      background: white !important;
+      font-family: 'Courier New', monospace !important;
+      font-size: 14pt !important;
+    }
+
     .screen-only {
-        display: block;
-    } .receipt-content {
-              max-width: 80mm;
-              margin: 0 auto;
-              padding: 20px;
-              background: #fff;
-              border-radius: 8px;
-              box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-          }
-    .receipt-header {
-        text-align: center;
-        margin-bottom: 1rem;
+      display: none !important;
     }
+
+    #receipt {
+      width: 80mm !important;
+      margin: 0 auto !important;
+      padding: 0 !important;
+      box-shadow: none !important;
+    }
+
+    .receipt-content {
+      all: initial !important;
+      font-family: inherit !important;
+      font-size: inherit !important;
+    }
+
     .receipt-header h3 {
-        margin: 0 0 0.5rem 0;
-        color: #2c3e50;
+      font-size: 16pt !important;
+      text-align: center !important;
     }
-    .receipt-row {
-        display: flex;
-        justify-content: space-between;
-        margin: 0.5rem 0;
+
+    .table-header span,
+    .table-row span,
+    .receipt-row span,
+    .receipt-total span {
+      width: 33%;
+      display: inline-block;
     }
+
     .receipt-divider {
-        border-bottom: 1px dashed #ddd;
-        margin: 1rem 0;
+      border-bottom: 2px dashed #000 !important;
     }
-    .table-header {
-        display: flex;
-        justify-content: space-between;
-        font-weight: bold;
-        margin-bottom: 0.5rem;
+
+    .receipt-footer {
+      text-align: center !important;
+      margin-top: 1rem !important;
     }
-    .table-row {
-        display: flex;
-        justify-content: space-between;
-        margin: 0.3rem 0;
-    }
-    /* Print Styles */
-    @media print {
-        /* Add this rule to hide footer */
-        footer,
-        .footer,
-        .site-footer {
-            display: none !important;
-        }
-        @page {
-            size: auto;
-            margin: 5mm;
-        }
-        body {
-            background: white !important;
-            font-family: 'Courier New', monospace !important;
-            font-size: 14pt !important;
-        }
-        .screen-only {
-            display: none !important;
-        }
-        #receipt {
-            width: 80mm !important;
-            margin: 0 auto !important;
-            padding: 0 !important;
-            box-shadow: none !important;
-        }
-        .receipt-content {
-            all: initial !important;
-            font-family: inherit !important;
-            font-size: inherit !important;
-        }
-        .receipt-header h3 {
-            font-size: 16pt !important;
-            text-align: center !important;
-        }
-        .table-header span,
-        .table-row span {
-            width: 33%;
-            display: inline-block;
-        }
-        .receipt-divider {
-            border-bottom: 2px dashed #000 !important;
-        }
-        .receipt-footer {
-            text-align: center !important;
-            margin-top: 1rem !important;
-        }
-    }
+  }
 </style>
+
 <script>
-    document.addEventListener('DOMContentLoaded', function()
-    {
-        // Use the browser's locale to format date + time
-        const now = new Date();
-        // e.g. "Jul 14, 2025, 4:23 PM"
-        const formatted = now.toLocaleString(undefined, {
-            month: 'short',
-            day: '2-digit',
-            year: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-        });
-        const el = document.getElementById('client-date');
-        if (el) el.textContent = formatted;
+document.addEventListener('DOMContentLoaded', function () {
+  const payBtn = document.getElementById('mpesa-pay');
+  const phoneInput = document.getElementById('mpesa-phone');
+  const amountInput = document.getElementById('mpesa-amount');
+
+  const successModalEl = document.getElementById('mpesaSuccessModal');
+  const successRecipient = document.getElementById('successRecipient');
+  const successCode = document.getElementById('successCode');
+  const successAmount = document.getElementById('successAmount');
+
+  const successModal = successModalEl ? new bootstrap.Modal(successModalEl) : null;
+
+  // Set client-side date/time
+  const now = new Date();
+  const formatted = now.toLocaleString(undefined, {
+    month: 'short',
+    day: '2-digit',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+
+  const dateEl = document.getElementById('client-date');
+  if (dateEl) dateEl.textContent = formatted;
+
+  // CSRF helper
+  function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return '';
+  }
+
+  // Normalize phone number to 2547XXXXXXXX
+  function normalizePhone(phone) {
+    phone = phone.trim();
+
+    if (phone.startsWith('07')) {
+      return '254' + phone.substring(1);
+    }
+
+    if (phone.startsWith('+254')) {
+      return phone.substring(1);
+    }
+
+    return phone;
+  }
+
+  // Check payment status
+  async function checkPaymentStatus() {
+    const url = "{% url 'mpesa_payment_status' order.id %}";
+
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
     });
-    document.getElementById('mpesa-pay').addEventListener('click', function(e) {
+
+    return await res.json();
+  }
+
+  // Show success modal
+  function showSuccessDialog(data) {
+    if (successRecipient) {
+      successRecipient.textContent = data.recipient_name || 'Cakes By Brenda';
+    }
+
+    if (successCode) {
+      successCode.textContent = data.receipt_number || '-';
+    }
+
+    if (successAmount) {
+      successAmount.textContent = data.amount ? `Ksh ${data.amount}` : '-';
+    }
+
+    if (successModal) {
+      successModal.show();
+    } else {
+      alert(
+        `Payment successful!\n\nRecipient: ${data.recipient_name || 'Cakes By Brenda'}\nM-Pesa Code: ${data.receipt_number || '-'}`
+      );
+    }
+  }
+
+  // Poll payment status
+  function pollUntilSuccess() {
+    let attempts = 0;
+    const maxAttempts = 20;
+
+    const timer = setInterval(async () => {
+      attempts++;
+
+      try {
+        const data = await checkPaymentStatus();
+        console.log("Payment status:", data);
+
+        if (data.status === 'success') {
+          clearInterval(timer);
+          showSuccessDialog(data);
+        } else if (data.status === 'failed') {
+          clearInterval(timer);
+          alert('Payment failed or cancelled.');
+        } else if (attempts >= maxAttempts) {
+          clearInterval(timer);
+          alert('Payment still pending. Check your phone.');
+        }
+
+      } catch (error) {
+        console.error("Polling error:", error);
+
+        if (attempts >= maxAttempts) {
+          clearInterval(timer);
+          alert('Error checking payment status.');
+        }
+      }
+
+    }, 3000);
+  }
+
+  // Handle M-Pesa payment
+  if (payBtn) {
+    payBtn.addEventListener('click', async function (e) {
       e.preventDefault();
-      const phone = document.getElementById('mpesa-phone').value.trim();
-      const amount = document.getElementById('mpesa-amount').value.trim();
-      if (!phone || !amount) { alert('Enter phone and amount'); return; }
+
+      let phone = normalizePhone(phoneInput.value);
+      const amount = amountInput.value.trim();
+
+      if (!phone || !amount) {
+        alert('Please enter phone number and amount.');
+        return;
+      }
+
+      console.log("Sending STK push:", { phone, amount });
 
       const url = "{% url 'mpesa_stk_push' order.id %}";
-      const csrftoken = (function(){ // simplistic getCookie
-        const name='csrftoken='; const ca = document.cookie.split(';');
-        for (let c of ca) { c=c.trim(); if (c.startsWith(name)) return decodeURIComponent(c.substring(name.length)); }
-        return '';
-      })();
+      const csrftoken = getCookie('csrftoken');
 
-      const fd = new FormData();
-      fd.append('phone', phone);
-      fd.append('amount', amount);
+      const formData = new FormData();
+      formData.append('phone', phone);
+      formData.append('amount', amount);
 
-      fetch(url, {
-        method: 'POST',
-        headers: {'X-CSRFToken': csrftoken},
-        body: fd
-      }).then(r => r.json())
-        .then(data => {
-          if (data.status === 'ok') {
-            alert('STK Push sent. Check phone for prompt.\n' + (data.message || ''));
-          } else {
-            alert('Error initiating payment: ' + JSON.stringify(data));
-          }
-        }).catch(err => {
-          console.error(err); alert('Network error');
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': csrftoken },
+          body: formData
         });
+
+        const data = await response.json();
+        console.log("STK response:", data);
+
+        if (data.status === 'ok') {
+          alert('STK Push sent. Enter your PIN on your phone.');
+          pollUntilSuccess();
+        } else {
+          alert(data.message || 'Failed to initiate payment.');
+        }
+
+      } catch (error) {
+        console.error("STK error:", error);
+        alert('Network error. Try again.');
+      }
+    });
+  }
 });
 </script>
 {% endblock %}
-

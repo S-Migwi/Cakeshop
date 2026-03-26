@@ -101,3 +101,19 @@ class MpesaTransaction(models.Model):
     updated = models.DateTimeField(auto_now=True)
     def __str__(self):
         return f"MpesaTxn {self.id} {self.phone} {self.amount} {self.status}"
+
+
+class MpesaPayment(models.Model):
+    order = models.OneToOneField('customers.Order', on_delete=models.CASCADE, related_name='mpesa_payment')
+    checkout_request_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    merchant_request_id = models.CharField(max_length=100, blank=True, null=True)
+    receipt_number = models.CharField(max_length=50, blank=True, null=True)
+    phone_number = models.CharField(max_length=20, blank=True, null=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    result_code = models.CharField(max_length=10, blank=True, null=True)
+    result_desc = models.CharField(max_length=255, blank=True, null=True)
+    status = models.CharField(max_length=20, default='pending')  # pending/success/failed
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"M-Pesa payment for Order #{self.order.id}"

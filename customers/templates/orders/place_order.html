@@ -18,7 +18,7 @@
   }
   .order-summary-card {
     position: sticky;
-    top: 80px; /* keeps the summary visible while scrolling the product list */
+    top: 80px;
   }
   .order-summary .total-input {
     width: 100%;
@@ -34,7 +34,6 @@
     flex-wrap: wrap;
   }
 
-  /* Small screens: stack columns and remove sticky to prevent awkward behavior */
   @media (max-width: 991.98px) {
     .order-summary-card {
       position: static;
@@ -46,7 +45,6 @@
     }
   }
 
-  /* subtle visual improvements */
   .list-group-item { align-items: center; }
   .search-bar { margin-bottom: 0.5rem; }
 </style>
@@ -65,7 +63,7 @@
         <li class="nav-item"><a class="nav-link" href="{% url 'orders_report' %}">Orders Report</a></li>
         <li class="nav-item">
           {% if user.is_superuser %}
-              <a class="nav-link" href="{% url 'profit_loss' %}">Profit & Loss</a>
+            <a class="nav-link" href="{% url 'profit_loss' %}">Profit & Loss</a>
           {% endif %}
         </li>
         <li class="nav-item"><a class="nav-link" href="{% url 'feedback' %}">Feedbacks</a></li>
@@ -96,12 +94,23 @@
       </div>
     </form>
 
+    {% if messages %}
+      <div class="alert-container">
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
     <form id="orderForm" method="POST">
       {% csrf_token %}
       <input type="hidden" name="action" id="actionField" value="">
 
       <div class="row g-4">
-        <!-- LEFT: Product list (scrollable on larger screens) -->
+        <!-- LEFT: Product list -->
         <div class="col-lg-8">
           <div class="card">
             <div class="card-body product-panel p-2">
@@ -111,12 +120,30 @@
                   <li class="list-group-item d-flex justify-content-between align-items-center">
                     <div class="w-50">
                       <div class="form-check">
-                        <input class="form-check-input product-checkbox" type="checkbox" name="products" value="{{ product.id }}" id="prod_{{ product.id }}">
-                        <label class="form-check-label product-label" for="prod_{{ product.id }}">{{ product.name }} <small class="text-muted">(In stock: {{ product.stock }})</small></label>
+                        <input
+                          class="form-check-input product-checkbox"
+                          type="checkbox"
+                          name="products"
+                          value="{{ product.id }}"
+                          id="prod_{{ product.id }}"
+                          {% if product.id in selected_ids %}checked{% endif %}
+                        >
+                        <label class="form-check-label product-label" for="prod_{{ product.id }}">
+                          {{ product.name }} <small class="text-muted">(In stock: {{ product.stock }})</small>
+                        </label>
                       </div>
                     </div>
+
                     <div class="d-flex align-items-center">
-                      <input type="number" name="quantity_{{ product.id }}" class="form-control form-control-sm me-2 quantity-input" value="1" min="1" max="{{ product.stock }}" disabled>
+                      <input
+                        type="number"
+                        name="quantity_{{ product.id }}"
+                        class="form-control form-control-sm me-2 quantity-input"
+                        value="1"
+                        min="1"
+                        max="{{ product.stock }}"
+                        {% if product.id not in selected_ids %}disabled{% endif %}
+                      >
                       <span class="price-badge badge bg-primary rounded-pill fs-6">Kshs {{ product.price }}</span>
                     </div>
                   </li>
@@ -126,7 +153,7 @@
           </div>
         </div>
 
-        <!-- RIGHT: Sticky order summary -->
+        <!-- RIGHT: Order summary -->
         <div class="col-lg-4">
           <div class="card order-summary-card">
             <div class="card-body">
@@ -147,8 +174,6 @@
               </div>
             </div>
           </div>
-
-          <!-- optional quick actions or recent orders could go here -->
         </div>
       </div>
     </form>
@@ -166,15 +191,36 @@ document.addEventListener('DOMContentLoaded', () => {
   const calculateBtn = document.getElementById('calculateBtn');
   const productListItems = Array.from(document.querySelectorAll('#productList li'));
 
-  // Search controls
+  const searchForm = document.getElementById('searchForm');
   const searchInput = document.getElementById('searchInput');
   const clearSearchBtn = document.getElementById('clearSearchBtn');
 
-  if (!productListItems.length) {
-    console.warn('product list is empty or selector changed (#productList li).');
+  // Restore saved state after page reload
+  const savedTotal = sessionStorage.getItem('order_total');
+  if (savedTotal) {
+    totalField.value = savedTotal;
+    saveBtn.disabled = false;
+    printBtn.disabled = false;
   }
 
-  // Initialize data-price attribute for each product price badge
+  const savedSelection = JSON.parse(sessionStorage.getItem('order_selection') || '[]');
+
+  productListItems.forEach(li => {
+    const cb = li.querySelector('.product-checkbox');
+    const qtyInput = li.querySelector('.quantity-input');
+    if (!cb || !qtyInput) return;
+
+    if (savedSelection.includes(cb.value)) {
+      cb.checked = true;
+      qtyInput.disabled = false;
+    }
+
+    cb.addEventListener('change', () => {
+      qtyInput.disabled = !cb.checked;
+      if (!cb.checked) qtyInput.value = 1;
+    });
+  });
+
   productListItems.forEach(li => {
     const priceBadge = li.querySelector('.price-badge');
     if (!priceBadge) return;
@@ -182,25 +228,11 @@ document.addEventListener('DOMContentLoaded', () => {
     priceBadge.dataset.price = raw || '0';
   });
 
-  // Toggle quantity inputs when checkbox toggled
-  productListItems.forEach(li => {
-    const cb = li.querySelector('.product-checkbox');
-    const qtyInput = li.querySelector('.quantity-input');
-    if (!cb || !qtyInput) return;
-    cb.addEventListener('change', () => {
-      qtyInput.disabled = !cb.checked;
-      if (!cb.checked) qtyInput.value = 1;
-    });
-  });
-
-  // Helper to get label text for a list item (fallbacks to li text)
   function getLabelText(li) {
     const labelEl = li.querySelector('.product-label') || li.querySelector('.form-check-label');
-    if (labelEl && labelEl.textContent) return labelEl.textContent.toLowerCase();
-    return li.textContent.toLowerCase();
+    return labelEl ? labelEl.textContent.toLowerCase() : li.textContent.toLowerCase();
   }
 
-  // Live filter function (term is already trimmed)
   function filterProductsLive(term) {
     const q = (term || '').toLowerCase().trim();
     productListItems.forEach(li => {
@@ -208,87 +240,81 @@ document.addEventListener('DOMContentLoaded', () => {
       const show = !q || label.indexOf(q) !== -1;
       li.style.display = show ? '' : 'none';
 
-      // keep state consistent when hidden
       const cb = li.querySelector('.product-checkbox');
       const qtyInput = li.querySelector('.quantity-input');
       if (cb && qtyInput) {
-        if (!show) {
-          cb.checked = false;
-          qtyInput.value = 1;
-          qtyInput.disabled = true;
-        } else {
-          qtyInput.disabled = !cb.checked;
-        }
+        qtyInput.disabled = !cb.checked;
       }
     });
   }
 
-  // live filter on typing (still allows Enter to submit the GET search)
-  if (searchInput) {
-    searchInput.addEventListener('input', (e) => {
-      try {
-        filterProductsLive(e.target.value);
-      } catch (err) {
-        console.error('Error during live filtering:', err);
-      }
-    });
-
-    clearSearchBtn.addEventListener('click', () => {
-      searchInput.value = '';
-      // ensure server-side results cleared too by navigating to base path
-      window.location.href = window.location.pathname;
-      filterProductsLive('');
-    });
-  } else {
-    console.warn('searchInput element not found. Server-side search still works on submit.');
-  }
-
-  // Calculate total with selection validation (only on visible rows)
   calculateBtn.addEventListener('click', () => {
-    // Use computed style to check visibility
     const visibleItems = productListItems.filter(li => getComputedStyle(li).display !== 'none');
     const selectedBoxes = visibleItems.filter(li => li.querySelector('.product-checkbox').checked);
+
     if (selectedBoxes.length === 0) {
       alert('Please select at least one product to calculate.');
       return;
     }
+
     let total = 0;
+    const selectedIds = [];
+
     for (const li of selectedBoxes) {
       const cb = li.querySelector('.product-checkbox');
       const id = cb.value;
-      const qty = Number(li.querySelector(`input[name=quantity_${id}]`).value) || 0;
+      const qty = Number(li.querySelector(`input[name="quantity_${id}"]`).value) || 0;
       const price = parseFloat(li.querySelector('.price-badge').dataset.price) || 0;
-      if (qty < 1) { alert('Quantity must be at least 1'); return; }
+
+      if (qty < 1) {
+        alert('Quantity must be at least 1');
+        return;
+      }
+
       total += qty * price;
+      selectedIds.push(id);
     }
+
     totalField.value = 'Kshs ' + total.toFixed(2);
     saveBtn.disabled = false;
     printBtn.disabled = false;
+
+    // keep values for printing after save/reload
+    sessionStorage.setItem('order_total', totalField.value);
+    sessionStorage.setItem('order_selection', JSON.stringify(selectedIds));
   });
 
-  // Save action -> prevent double submit
-  saveBtn.addEventListener('click', (e) => {
-    saveBtn.disabled = true;
-    saveBtn.textContent = 'Saving...';
+  saveBtn.addEventListener('click', () => {
     actionField.value = 'save';
+
+    // DO NOT clear the total field
+    // DO NOT disable print button
+    // DO NOT reset the form here
+
+    const selectedIds = Array.from(document.querySelectorAll('.product-checkbox:checked'))
+      .map(cb => cb.value);
+    sessionStorage.setItem('order_selection', JSON.stringify(selectedIds));
+    sessionStorage.setItem('order_total', totalField.value);
+
     orderForm.submit();
   });
 
-  // Print action -> disable & submit
-  printBtn.addEventListener('click', (e) => {
-    printBtn.disabled = true;
+  printBtn.addEventListener('click', () => {
     actionField.value = 'print';
     orderForm.submit();
   });
 
-  // Clear everything
   clearBtn.addEventListener('click', () => {
     totalField.value = '';
     saveBtn.disabled = true;
     printBtn.disabled = true;
+    sessionStorage.removeItem('order_total');
+    sessionStorage.removeItem('order_selection');
+
     productListItems.forEach(li => {
       const cb = li.querySelector('.product-checkbox');
       const qtyInput = li.querySelector('.quantity-input');
+
       if (cb) cb.checked = false;
       if (qtyInput) {
         qtyInput.disabled = true;
@@ -296,20 +322,16 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       li.style.display = '';
     });
+
     if (searchInput) {
       searchInput.value = '';
       filterProductsLive('');
     }
   });
 
-  // If the server passed a query value, apply it on load
   if (searchInput && searchInput.value) {
     filterProductsLive(searchInput.value);
   }
-
-  console.info('Split layout initialized — items:', productListItems.length);
 });
 </script>
-
-
 {% endblock %}
